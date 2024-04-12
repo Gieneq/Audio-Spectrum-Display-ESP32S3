@@ -1,0 +1,9 @@
+## IDF Component Manager Manifest File
+dependencies:
+  idf: ">=5.0"
+  
+  espressif/esp-dsp: "^1.2.1"
+  
+  espressif/esp-box-lite:
+    version: "2.*"
+    require: "no"
