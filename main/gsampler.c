@@ -15,16 +15,11 @@ static const char TAG[] = "Main";
 
 static RingbufHandle_t ringbuff_handle;
 
-// static int16_t mic_buffer[MIC_BUFF_SIZE];
-
 static void mic_sampler_task(void* params) {
     int ret = ESP_CODEC_DEV_OK;
 
     esp_codec_dev_handle_t mic_codec_dev = bsp_audio_codec_microphone_init();
-    int16_t recording_buffer[MIC_BUFF_SIZE] = {0};
-
-    // int16_t *recording_buffer = heap_caps_malloc(MIC_BUFF_SIZE, MALLOC_CAP_DEFAULT);
-    // assert(recording_buffer != NULL);
+    int16_t recording_buffer[MIC_RECORDING_BUFF_LENGHT] = {0};
 
     if (mic_codec_dev == NULL) {
         ESP_LOGW(TAG, "This board does not support microphone recording!");
@@ -37,7 +32,7 @@ static void mic_sampler_task(void* params) {
     }
 
     esp_codec_dev_sample_info_t fs = {
-        .sample_rate = SAMPLE_RATE,
+        .sample_rate = MIC_RECORDING_SAMPLE_RATE,
         .channel = 1,
         .bits_per_sample = 16,
     };
@@ -53,10 +48,9 @@ static void mic_sampler_task(void* params) {
     int64_t samples_collected = 0;
     float sampling_rate = 0;
     int16_t counter = 0;
-    int16_t tmp_sample = 0;
-    while(1) {
-        //todo not sure bytes or halfwords
-        
+    // int16_t tmp_sample = 0;
+
+    while(1) {        
         if(counter == 50) {
             last_time = recent_time;
             recent_time = esp_timer_get_time();
@@ -76,16 +70,16 @@ static void mic_sampler_task(void* params) {
         }
         ++counter;
 
-        // ESP_ERROR_CHECK(esp_codec_dev_read(mic_codec_dev, recording_buffer, MIC_BUFF_SIZE));
-        for(int i=0; i<MIC_BUFF_SIZE; ++i) {
-            recording_buffer[i] = tmp_sample++;
-        }
-        vTaskDelay(50);
+        ESP_ERROR_CHECK(esp_codec_dev_read(mic_codec_dev, recording_buffer, MIC_RECORDING_BUFF_SIZE));
+        // for(int i=0; i<MIC_RECORDING_BUFF_LENGHT; ++i) {
+        //     recording_buffer[i] = tmp_sample++;
+        // }
+        // vTaskDelay(1);
 
-        samples_collected += MIC_BUFF_SIZE;
+        samples_collected += MIC_RECORDING_BUFF_LENGHT;
 
-        if(xRingbufferSend(ringbuff_handle, (void*)recording_buffer, MIC_BUFF_SIZE * sizeof(int16_t), portMAX_DELAY) == pdFALSE) {
-            ESP_LOGE(TAG, "Generating test stall!");
+        if(xRingbufferSend(ringbuff_handle, (void*)recording_buffer, MIC_RECORDING_BUFF_SIZE, 0) == pdFALSE) {
+            ESP_LOGW(TAG, "Generating test stall!");
         }
     }
 }
@@ -96,34 +90,38 @@ static void gsampler_task(void* params) {
     size_t actual_halfwords_count = 0;
     size_t actual_bytes_count = 0;
 
-    int16_t receiver_buffer[SAMPLES_COUNT] = {0};
-    size_t remaining_halfwords_count = SAMPLES_COUNT; // * sizeof(int16_t)
+    int16_t receiver_buffer[RECEIVER_SAMPLES_COUNT] = {0};
+    size_t remaining_halfwords_count = RECEIVER_SAMPLES_COUNT; // * sizeof(int16_t)
     size_t receiver_buffer_idx = 0;
 
+    int32_t real_duration = 0;
+    int64_t last_time = esp_timer_get_time();
 
     while(1) {
         const size_t max_bytes_count_to_return = remaining_halfwords_count * sizeof(int16_t);
-        data = (int16_t*)xRingbufferReceiveUpTo(ringbuff_handle, &actual_bytes_count, portMAX_DELAY, max_bytes_count_to_return);
+        data = (int16_t*)xRingbufferReceiveUpTo(ringbuff_handle, &actual_bytes_count, 1, max_bytes_count_to_return);
         actual_halfwords_count = actual_bytes_count / 2;
 
-        if(actual_halfwords_count > 0) {
-            ESP_LOGW(TAG, "data=%d..%d, remaining_halfwords_count=%u, actual_halfwords_count=%u, target=%u", 
-                data[0], data[actual_halfwords_count - 1], remaining_halfwords_count, actual_halfwords_count, SAMPLES_COUNT);
+        if(data && (actual_halfwords_count > 0)) {
+            ESP_LOGV(TAG, "data=%d..%d, remaining_halfwords_count=%u, actual_halfwords_count=%u, target=%u", 
+                data[0], data[actual_halfwords_count - 1], remaining_halfwords_count, actual_halfwords_count, RECEIVER_SAMPLES_COUNT);
+            
             memcpy((void*)(receiver_buffer + receiver_buffer_idx), (void*)data, actual_bytes_count);
             receiver_buffer_idx += actual_halfwords_count;
             remaining_halfwords_count -= actual_halfwords_count;
             vRingbufferReturnItem(ringbuff_handle, (void*)data);
 
             if (remaining_halfwords_count == 0) {
-                ESP_LOGI(TAG, "Got enough. receiver_buffer=%d..%d, target=%u", receiver_buffer[0], receiver_buffer[receiver_buffer_idx - 1], SAMPLES_COUNT);
+                const int64_t recent_time = esp_timer_get_time();
+                real_duration = (int32_t)((recent_time - last_time) / 1000);
+                last_time = recent_time;
+                ESP_LOGI(TAG, "Got enough. receiver_buffer=%d..%d, target=%u, dur=%ld/%ldms", 
+                    receiver_buffer[0], receiver_buffer[receiver_buffer_idx - 1], RECEIVER_SAMPLES_COUNT, RECEIVER_SAMPLING_DURATION_MS, real_duration);
             
                 receiver_buffer_idx = 0;
-                remaining_halfwords_count = SAMPLES_COUNT;
+                remaining_halfwords_count = RECEIVER_SAMPLES_COUNT;
             }
         }
-
-
-        vTaskDelay(1);
     }
 }
 
@@ -147,7 +145,7 @@ esp_err_t gsampler_inti() {
     if(ret == ESP_OK) {
         (void)xTaskCreate(gsampler_task, "gsampler_task", 1024 * 8, NULL, 10, NULL);
         
-        (void)xTaskCreate(mic_sampler_task, "mic_sampler_task", 1024 * 8, NULL, 5, NULL);
+        (void)xTaskCreate(mic_sampler_task, "mic_sampler_task", 1024 * 16, NULL, 5, NULL);
     }
 
     if(ret == ESP_OK) {

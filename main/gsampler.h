@@ -6,10 +6,13 @@ extern "C" {
 
 #include "esp_err.h"
 
-#define SAMPLES_COUNT (1600U)
-#define RINGBUFFER_SIZE (8 * SAMPLES_COUNT)
-#define MIC_BUFF_SIZE   (1024 / 8)
-#define SAMPLE_RATE     (16000) // For recording
+#define MIC_RECORDING_BUFF_LENGHT   (512U)
+#define RINGBUFFER_SIZE (4 * MIC_RECORDING_BUFF_LENGHT)
+#define MIC_RECORDING_BUFF_SIZE  (MIC_RECORDING_BUFF_LENGHT * sizeof(int16_t))
+#define MIC_RECORDING_SAMPLE_RATE     (16000U)
+
+#define RECEIVER_SAMPLES_COUNT (2*1024U)
+#define RECEIVER_SAMPLING_DURATION_MS ((int32_t)(1000.0F*((float)RECEIVER_SAMPLES_COUNT)/((float)MIC_RECORDING_SAMPLE_RATE)))
 
 esp_err_t gsampler_inti();
 
