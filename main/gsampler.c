@@ -50,6 +50,7 @@ static freq_ampl_t fft_get_max_freq(float* fft_result, const size_t fft_real_sam
 }
 
 static void fft_printf(const size_t data_samples_count, float *fft_buff, float max_value) {
+    (void)max_value;
     float bins[FFT_PRINTF_BINS_COUNT] = {0};
     int16_t heights[FFT_PRINTF_BINS_COUNT];
     const int16_t values_per_bin = data_samples_count / FFT_PRINTF_BINS_COUNT; // 2048 / 64 = 32
@@ -58,12 +59,16 @@ static void fft_printf(const size_t data_samples_count, float *fft_buff, float m
     // int idx = 0;
 
     for(int i=0; i<data_samples_count; ++i) {
-        bins[i/values_per_bin] += fft_buff[i] / max_value; // norm
+        bins[i / values_per_bin] += fft_buff[i];
     }
 
     int16_t max_height = 0;
     for(int i=0; i<FFT_PRINTF_BINS_COUNT; ++i) {
-        heights[i] = (int16_t)(FFT_PRINTF_HEIGHT * bins[i] / (float)values_per_bin);
+        heights[i] = (int16_t)(1.0F * bins[i] / (float)values_per_bin);
+        if(heights[i] > FFT_MAX_HEIGHT) {
+            heights[i] = FFT_MAX_HEIGHT;
+        }
+
         if(heights[i] > max_height) {
             max_height = heights[i];
         }
@@ -92,8 +97,6 @@ static void fft_process(int16_t *data, const size_t data_samples_count, float *o
     assert(data);
     assert(out_buff);
     assert(data_samples_count == RECEIVER_SAMPLES_COUNT);
-
-    dsps_wind_hann_f32(window_time_domain, data_samples_count);
     
     for (int i = 0 ; i < data_samples_count ; i++) {
         out_buff[i] = ((float)data[i]) * window_time_domain[i];
@@ -109,8 +112,12 @@ static void fft_process(int16_t *data, const size_t data_samples_count, float *o
     }
 
     for (int i = 0 ; i < data_samples_count; i++) {
-        out_buff[i] = 10 * log10f(0.0000000000001 + out_buff[i * 2 + 0] * out_buff[i * 2 + 0] + out_buff[i * 2 + 1] * out_buff[i * 2 + 1]);
-        out_buff[i] += 130;
+        out_buff[i] = FFT_OFFSET + FFT_GAIN * log10f(0.0000000000001 + out_buff[i * 2 + 0] * out_buff[i * 2 + 0] + out_buff[i * 2 + 1] * out_buff[i * 2 + 1]);
+    
+        /* Threshold */
+        if(out_buff[i] < FFT_THRSH) {
+            out_buff[i] = 0;
+        }
     }
 }
 
@@ -125,7 +132,7 @@ static void mic_sampler_task(void* params) {
         assert(mic_codec_dev != NULL);
     }
 
-    ret = esp_codec_dev_set_in_gain(mic_codec_dev, 62.0);
+    ret = esp_codec_dev_set_in_gain(mic_codec_dev, 42.0);
     if (ret != ESP_CODEC_DEV_OK) {
         ESP_LOGE(TAG, "Failed setting volume");
     }
@@ -238,10 +245,10 @@ static void gsampler_processor_task(void* params) {
                 if(++some_couner > 25) {
                     some_couner = 0;
                     fft_printf(RECEIVER_SAMPLES_COUNT, fft_complex_workspace, fft_max_freq.ampl);
-                    // printf("fft_res = [");
-                    // for(int i=0; i<FFT_RESULT_SAMPLES_COUNT; ++i) {
-                    //     printf("%.2f%s", fft_complex_workspace[i], i < (FFT_RESULT_SAMPLES_COUNT - 1) ? ", " : "]\n");
-                    // }
+                    printf("fft_res = [");
+                    for(int i=0; i<FFT_RESULT_SAMPLES_COUNT; ++i) {
+                        printf("%.2f%s", fft_complex_workspace[i], i < (FFT_RESULT_SAMPLES_COUNT - 1) ? ", " : "]\n");
+                    }
                 }
 
                 receiver_buffer_idx = 0;
@@ -273,6 +280,8 @@ esp_err_t gsampler_inti() {
         ESP_LOGE(TAG, "Not possible to initialize FFT. Error = %i", ret);
         return ret;
     }
+
+    dsps_wind_hann_f32(window_time_domain, RECEIVER_SAMPLES_COUNT);
     
     if(ret == ESP_OK) {
         (void)xTaskCreate(gsampler_processor_task, "gsampler_processor_task", 1024 * 8, NULL, 10, NULL);
