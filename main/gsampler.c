@@ -13,6 +13,8 @@
 
 #include "esp_log.h"
 
+#include "display.h"
+
 static const char TAG[] = "Main";
 
 static RingbufHandle_t ringbuff_handle;
@@ -197,8 +199,10 @@ static void gsampler_processor_task(void* params) {
     int64_t last_time = esp_timer_get_time();
 
     int some_couner = 0;
+        bool was_drawn = false;
 
     while(1) {
+        was_drawn = false;
         const size_t max_bytes_count_to_return = remaining_halfwords_count * sizeof(int16_t);
         data = (int16_t*)xRingbufferReceiveUpTo(ringbuff_handle, &actual_bytes_count, 1, max_bytes_count_to_return);
         actual_halfwords_count = actual_bytes_count / 2;
@@ -222,7 +226,7 @@ static void gsampler_processor_task(void* params) {
                 const freq_ampl_t fft_max_freq = fft_get_max_freq(fft_complex_workspace, FFT_RESULT_SAMPLES_COUNT);
                 fft_fill_bins(fft_complex_workspace, fft_bins);
 
-                ESP_LOGI(TAG, "Got %u samples, recev_buff=%d..%d, dur=%ld/%ldms, fft=[%.2f, %.2f, %.2f, %.2f], max=%.2fHz/%.2f.", 
+                ESP_LOGV(TAG, "Got %u samples, recev_buff=%d..%d, dur=%ld/%ldms, fft=[%.2f, %.2f, %.2f, %.2f], max=%.2fHz/%.2f.", 
                     receiver_buffer_idx,
                     receiver_buffer[0], receiver_buffer[receiver_buffer_idx - 1],
                     RECEIVER_SAMPLING_DURATION_MS, real_duration,
@@ -230,17 +234,29 @@ static void gsampler_processor_task(void* params) {
                     fft_max_freq.freq, fft_max_freq.ampl
                 );
 
-                if(++some_couner > 25) {
-                    some_couner = 0;
-                    fft_printf(fft_bins);
-                    printf("fft_res = [");
-                    for(int i=0; i<FFT_RESULT_SAMPLES_COUNT; ++i) {
-                        printf("%.2f%s", fft_complex_workspace[i], i < (FFT_RESULT_SAMPLES_COUNT - 1) ? ", " : "]\n");
-                    }
+                // if(++some_couner > 25) {
+                //     some_couner = 0;
+                //     fft_printf(fft_bins);
+                //     printf("fft_res = [");
+                //     for(int i=0; i<FFT_RESULT_SAMPLES_COUNT; ++i) {
+                //         printf("%.2f%s", fft_complex_workspace[i], i < (FFT_RESULT_SAMPLES_COUNT - 1) ? ", " : "]\n");
+                //     }
+                // }
+                was_drawn = true;
+                const esp_err_t draw_ret = display_draw_custom(fft_bins);
+                if(draw_ret != ESP_OK) {
+                    ESP_LOGW(TAG, "Draw failed! ret=%d.", draw_ret);
                 }
 
                 receiver_buffer_idx = 0;
                 remaining_halfwords_count = RECEIVER_SAMPLES_COUNT;
+            }
+        }
+
+        if(!was_drawn) {
+            const esp_err_t draw_ret = display_draw_custom(NULL);
+            if(draw_ret != ESP_OK) {
+                ESP_LOGW(TAG, "Draw failed! ret=%d.", draw_ret);
             }
         }
     }
@@ -266,6 +282,12 @@ esp_err_t gsampler_inti() {
     ret = dsps_fft2r_init_fc32(NULL, CONFIG_DSP_MAX_FFT_SIZE);
     if (ret  != ESP_OK) {
         ESP_LOGE(TAG, "Not possible to initialize FFT. Error = %i", ret);
+        return ret;
+    }
+
+    ret = display_lcd_init();
+        if (ret  != ESP_OK) {
+        ESP_LOGE(TAG, "Not possible to display_lcd_init. Error = %i", ret);
         return ret;
     }
 

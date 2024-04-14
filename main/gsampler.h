@@ -27,9 +27,9 @@ extern "C" {
 
 #define FFT_OFFSET  (50.0f)
 #define FFT_GAIN    (10.0f)
-#define FFT_THRSH   (42.0f)
+#define FFT_THRSH   (12.0f)
 
-#define FFT_BINS_FACTOR   (0.05f)
+#define FFT_BINS_FACTOR   (0.15f)
 
 #define FFT_MAX_HEIGHT          (50)
 
