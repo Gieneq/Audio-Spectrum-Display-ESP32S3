@@ -6,13 +6,23 @@ extern "C" {
 
 #include "esp_err.h"
 
+/* 
+ * Uncomment to use test samples 
+ * instead of microphone
+ */
+//  #define USE_TEST_SAMPLES 1
+
 #define MIC_RECORDING_BUFF_LENGHT   (512U)
 #define RINGBUFFER_SIZE (4 * MIC_RECORDING_BUFF_LENGHT)
 #define MIC_RECORDING_BUFF_SIZE  (MIC_RECORDING_BUFF_LENGHT * sizeof(int16_t))
 #define MIC_RECORDING_SAMPLE_RATE     (16000U)
 
-#define RECEIVER_SAMPLES_COUNT (2*1024U)
+#define RECEIVER_SAMPLES_COUNT (2 * 1024U)
 #define RECEIVER_SAMPLING_DURATION_MS ((int32_t)(1000.0F*((float)RECEIVER_SAMPLES_COUNT)/((float)MIC_RECORDING_SAMPLE_RATE)))
+
+#define FFT_RESULT_SAMPLES_COUNT (RECEIVER_SAMPLES_COUNT / 2)
+
+#define SAMPLE_IDX_TO_FREQ(_idx)      ( ((float)(MIC_RECORDING_SAMPLE_RATE/2)) * ((float)(_idx)) / ((float)(FFT_RESULT_SAMPLES_COUNT)) / 2.0F )
 
 esp_err_t gsampler_inti();
 

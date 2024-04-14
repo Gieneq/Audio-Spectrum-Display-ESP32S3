@@ -8,12 +8,72 @@
 #include "esp_timer.h"
 
 #include "bsp/esp-bsp.h"
+#include <math.h>
+#include "esp_dsp.h"
 
 #include "esp_log.h"
 
 static const char TAG[] = "Main";
 
 static RingbufHandle_t ringbuff_handle;
+
+
+__attribute__((aligned(16))) float window_time_domain[RECEIVER_SAMPLES_COUNT];
+__attribute__((aligned(16))) float fft_complex_workspace[RECEIVER_SAMPLES_COUNT * 2];
+
+typedef struct freq_ampl_t {
+    size_t idx;
+    float freq;
+    float ampl;
+} freq_ampl_t;
+
+static freq_ampl_t fft_get_max_freq(float* fft_result, const size_t fft_real_samples) {
+    assert(fft_result);
+    assert(fft_real_samples > 1);
+
+    freq_ampl_t result = {
+        .idx=0,
+        .freq=SAMPLE_IDX_TO_FREQ(0),
+        .ampl=fft_result[0]
+    };
+
+    for (int sample_idx = 1; sample_idx < fft_real_samples; sample_idx++) {
+        if (fft_result[sample_idx] > result.ampl) {
+            result.idx = sample_idx;
+            result.ampl = fft_result[sample_idx];
+        }
+    }
+
+    result.freq = SAMPLE_IDX_TO_FREQ(result.idx);
+
+    return result;
+}
+
+static void fft_process(int16_t *data, const size_t data_samples_count, float *out_buff) {
+    assert(data);
+    assert(out_buff);
+    assert(data_samples_count == RECEIVER_SAMPLES_COUNT);
+
+    dsps_wind_hann_f32(window_time_domain, data_samples_count);
+    
+    for (int i = 0 ; i < data_samples_count ; i++) {
+        out_buff[i] = ((float)data[i]) * window_time_domain[i];
+        // out_buff[i] = out_buff[i] / INT16_MAX;
+    }
+
+    dsps_fft2r_fc32(out_buff, data_samples_count);
+
+    dsps_bit_rev_fc32(out_buff, data_samples_count);
+
+    for (int i = 0 ; i < (data_samples_count * 2) ; i++) {
+        out_buff[i] = out_buff[i] / INT16_MAX;
+    }
+
+    for (int i = 0 ; i < data_samples_count; i++) {
+        out_buff[i] = 10 * log10f(0.0000000000001 + out_buff[i * 2 + 0] * out_buff[i * 2 + 0] + out_buff[i * 2 + 1] * out_buff[i * 2 + 1]);
+        out_buff[i] += 130;
+    }
+}
 
 static void mic_sampler_task(void* params) {
     int ret = ESP_CODEC_DEV_OK;
@@ -26,10 +86,11 @@ static void mic_sampler_task(void* params) {
         assert(mic_codec_dev != NULL);
     }
 
-    ret = esp_codec_dev_set_in_gain(mic_codec_dev, 42.0);
+    ret = esp_codec_dev_set_in_gain(mic_codec_dev, 62.0);
     if (ret != ESP_CODEC_DEV_OK) {
         ESP_LOGE(TAG, "Failed setting volume");
     }
+    
 
     esp_codec_dev_sample_info_t fs = {
         .sample_rate = MIC_RECORDING_SAMPLE_RATE,
@@ -48,7 +109,12 @@ static void mic_sampler_task(void* params) {
     int64_t samples_collected = 0;
     float sampling_rate = 0;
     int16_t counter = 0;
-    // int16_t tmp_sample = 0;
+
+    // int some_couner = 0;
+
+#ifdef USE_TEST_SAMPLES
+    int16_t test_sample = 0;
+#endif
 
     while(1) {        
         if(counter == 50) {
@@ -62,7 +128,7 @@ static void mic_sampler_task(void* params) {
                 sampling_rate = 1000000.0F * ((float)samples_collected) / ((float)interval_us);
             }
             
-            ESP_LOGE(TAG, "Batch done! interval_us=%lldus, sampling_rate(in bytes?)=%f, samples_collected=%lld.", 
+            ESP_LOGV(TAG, "Batch done! interval_us=%lldus, sampling_rate(in bytes?)=%f, samples_collected=%lld.", 
                 interval_us, sampling_rate, samples_collected);
 
             counter = 0;
@@ -70,11 +136,22 @@ static void mic_sampler_task(void* params) {
         }
         ++counter;
 
+#ifdef USE_TEST_SAMPLES
+        for(int i=0; i<MIC_RECORDING_BUFF_LENGHT; ++i) {
+            recording_buffer[i] = test_sample++;
+        }
+        vTaskDelay(1);
+#else
         ESP_ERROR_CHECK(esp_codec_dev_read(mic_codec_dev, recording_buffer, MIC_RECORDING_BUFF_SIZE));
-        // for(int i=0; i<MIC_RECORDING_BUFF_LENGHT; ++i) {
-        //     recording_buffer[i] = tmp_sample++;
+#endif
+
+        // if(++some_couner > 25) {
+        //     some_couner = 0;
+        //     printf("data = [");
+        //     for(int i=0; i<MIC_RECORDING_BUFF_LENGHT; ++i) {
+        //         printf("%d%s", recording_buffer[i], i < (MIC_RECORDING_BUFF_LENGHT - 1) ? ", " : "]\n");
+        //     }
         // }
-        // vTaskDelay(1);
 
         samples_collected += MIC_RECORDING_BUFF_LENGHT;
 
@@ -84,7 +161,7 @@ static void mic_sampler_task(void* params) {
     }
 }
 
-static void gsampler_task(void* params) {
+static void gsampler_processor_task(void* params) {
     int16_t* data = NULL;
     // UBaseType_t ringbuff_waiting_bytes_count = 0;
     size_t actual_halfwords_count = 0;
@@ -97,6 +174,12 @@ static void gsampler_task(void* params) {
     int32_t real_duration = 0;
     int64_t last_time = esp_timer_get_time();
 
+    // float* fft_buff = (float *)calloc(1, RECEIVER_SAMPLES_COUNT * sizeof(float)); //*2
+
+    // assert(fft_buff != NULL);
+
+    int some_couner = 0;
+
     while(1) {
         const size_t max_bytes_count_to_return = remaining_halfwords_count * sizeof(int16_t);
         data = (int16_t*)xRingbufferReceiveUpTo(ringbuff_handle, &actual_bytes_count, 1, max_bytes_count_to_return);
@@ -106,18 +189,56 @@ static void gsampler_task(void* params) {
             ESP_LOGV(TAG, "data=%d..%d, remaining_halfwords_count=%u, actual_halfwords_count=%u, target=%u", 
                 data[0], data[actual_halfwords_count - 1], remaining_halfwords_count, actual_halfwords_count, RECEIVER_SAMPLES_COUNT);
             
+
+
+            // if(++some_couner > 25) {
+            //     some_couner = 0;
+            //     printf("data_size = %u\n", actual_halfwords_count);
+            //     printf("data = [");
+            //     for(int i=0; i<actual_halfwords_count; ++i) {
+            //         printf("%d%s", data[i], i < (actual_halfwords_count - 1) ? ", " : "]\n");
+            //     }
+            // }
+
+            // memcpy((void*)(receiver_buffer + 0), (void*)data, actual_bytes_count);
             memcpy((void*)(receiver_buffer + receiver_buffer_idx), (void*)data, actual_bytes_count);
             receiver_buffer_idx += actual_halfwords_count;
             remaining_halfwords_count -= actual_halfwords_count;
             vRingbufferReturnItem(ringbuff_handle, (void*)data);
 
             if (remaining_halfwords_count == 0) {
+                /* Got enough */
+                
+                // if(++some_couner > 25) {
+                //     some_couner = 0;
+                //     printf("data = [");
+                //     for(int i=0; i<RECEIVER_SAMPLES_COUNT; ++i) {
+                //         printf("%d%s", receiver_buffer[i], i < (RECEIVER_SAMPLES_COUNT - 1) ? ", " : "]\n");
+                //     }
+                // }
+
                 const int64_t recent_time = esp_timer_get_time();
                 real_duration = (int32_t)((recent_time - last_time) / 1000);
                 last_time = recent_time;
-                ESP_LOGI(TAG, "Got enough. receiver_buffer=%d..%d, target=%u, dur=%ld/%ldms", 
-                    receiver_buffer[0], receiver_buffer[receiver_buffer_idx - 1], RECEIVER_SAMPLES_COUNT, RECEIVER_SAMPLING_DURATION_MS, real_duration);
-            
+                fft_process(receiver_buffer, RECEIVER_SAMPLES_COUNT, fft_complex_workspace);
+                const freq_ampl_t fft_max_freq = fft_get_max_freq(fft_complex_workspace, FFT_RESULT_SAMPLES_COUNT);
+
+                ESP_LOGI(TAG, "Got %u samples, recev_buff=%d..%d, dur=%ld/%ldms, fft=[%.2f, %.2f, %.2f, %.2f], max=%.2fHz/%.2f.", 
+                    receiver_buffer_idx,
+                    receiver_buffer[0], receiver_buffer[receiver_buffer_idx - 1],
+                    RECEIVER_SAMPLING_DURATION_MS, real_duration,
+                    fft_complex_workspace[0], fft_complex_workspace[1], fft_complex_workspace[2], fft_complex_workspace[3],
+                    fft_max_freq.freq, fft_max_freq.ampl
+                );
+
+                if(++some_couner > 25) {
+                    some_couner = 0;
+                    printf("fft_res = [");
+                    for(int i=0; i<FFT_RESULT_SAMPLES_COUNT; ++i) {
+                        printf("%.2f%s", fft_complex_workspace[i], i < (FFT_RESULT_SAMPLES_COUNT - 1) ? ", " : "]\n");
+                    }
+                }
+
                 receiver_buffer_idx = 0;
                 remaining_halfwords_count = RECEIVER_SAMPLES_COUNT;
             }
@@ -141,9 +262,15 @@ esp_err_t gsampler_inti() {
     }
 
     ret = ESP_OK;
+
+    ret = dsps_fft2r_init_fc32(NULL, CONFIG_DSP_MAX_FFT_SIZE);
+    if (ret  != ESP_OK) {
+        ESP_LOGE(TAG, "Not possible to initialize FFT. Error = %i", ret);
+        return ret;
+    }
     
     if(ret == ESP_OK) {
-        (void)xTaskCreate(gsampler_task, "gsampler_task", 1024 * 8, NULL, 10, NULL);
+        (void)xTaskCreate(gsampler_processor_task, "gsampler_processor_task", 1024 * 8, NULL, 10, NULL);
         
         (void)xTaskCreate(mic_sampler_task, "mic_sampler_task", 1024 * 16, NULL, 5, NULL);
     }
