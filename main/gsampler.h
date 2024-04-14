@@ -24,6 +24,9 @@ extern "C" {
 
 #define SAMPLE_IDX_TO_FREQ(_idx)      ( ((float)(MIC_RECORDING_SAMPLE_RATE/2)) * ((float)(_idx)) / ((float)(FFT_RESULT_SAMPLES_COUNT)) / 2.0F )
 
+#define FFT_PRINTF_BINS_COUNT   (64*2)
+#define FFT_PRINTF_HEIGHT       (16)
+
 esp_err_t gsampler_inti();
 
 #ifdef __cplusplus

@@ -49,6 +49,45 @@ static freq_ampl_t fft_get_max_freq(float* fft_result, const size_t fft_real_sam
     return result;
 }
 
+static void fft_printf(const size_t data_samples_count, float *fft_buff, float max_value) {
+    float bins[FFT_PRINTF_BINS_COUNT] = {0};
+    int16_t heights[FFT_PRINTF_BINS_COUNT];
+    const int16_t values_per_bin = data_samples_count / FFT_PRINTF_BINS_COUNT; // 2048 / 64 = 32
+    assert(data_samples_count == (values_per_bin * FFT_PRINTF_BINS_COUNT));
+
+    // int idx = 0;
+
+    for(int i=0; i<data_samples_count; ++i) {
+        bins[i/values_per_bin] += fft_buff[i] / max_value; // norm
+    }
+
+    int16_t max_height = 0;
+    for(int i=0; i<FFT_PRINTF_BINS_COUNT; ++i) {
+        heights[i] = (int16_t)(FFT_PRINTF_HEIGHT * bins[i] / (float)values_per_bin);
+        if(heights[i] > max_height) {
+            max_height = heights[i];
+        }
+    }
+
+    /* Draw graph */
+    for(int iy=0; iy<FFT_PRINTF_HEIGHT; ++iy) {
+        const int height_threshold = FFT_PRINTF_HEIGHT - iy - 1;
+
+        for(int ix=0; ix<FFT_PRINTF_BINS_COUNT; ++ix) {
+            const int16_t height_value = heights[ix];
+            printf("%s", height_value >= height_threshold ? "|" : " ");
+        }
+        printf("\n");
+    }
+
+    for(int ix=0; ix<FFT_PRINTF_BINS_COUNT; ++ix) {
+        printf("_");
+    }
+    printf("\n");
+    printf("max_val=%.3f, max_height=%d\n", max_value, max_height);
+
+}
+
 static void fft_process(int16_t *data, const size_t data_samples_count, float *out_buff) {
     assert(data);
     assert(out_buff);
@@ -91,7 +130,6 @@ static void mic_sampler_task(void* params) {
         ESP_LOGE(TAG, "Failed setting volume");
     }
     
-
     esp_codec_dev_sample_info_t fs = {
         .sample_rate = MIC_RECORDING_SAMPLE_RATE,
         .channel = 1,
@@ -109,8 +147,6 @@ static void mic_sampler_task(void* params) {
     int64_t samples_collected = 0;
     float sampling_rate = 0;
     int16_t counter = 0;
-
-    // int some_couner = 0;
 
 #ifdef USE_TEST_SAMPLES
     int16_t test_sample = 0;
@@ -145,14 +181,6 @@ static void mic_sampler_task(void* params) {
         ESP_ERROR_CHECK(esp_codec_dev_read(mic_codec_dev, recording_buffer, MIC_RECORDING_BUFF_SIZE));
 #endif
 
-        // if(++some_couner > 25) {
-        //     some_couner = 0;
-        //     printf("data = [");
-        //     for(int i=0; i<MIC_RECORDING_BUFF_LENGHT; ++i) {
-        //         printf("%d%s", recording_buffer[i], i < (MIC_RECORDING_BUFF_LENGHT - 1) ? ", " : "]\n");
-        //     }
-        // }
-
         samples_collected += MIC_RECORDING_BUFF_LENGHT;
 
         if(xRingbufferSend(ringbuff_handle, (void*)recording_buffer, MIC_RECORDING_BUFF_SIZE, 0) == pdFALSE) {
@@ -163,20 +191,16 @@ static void mic_sampler_task(void* params) {
 
 static void gsampler_processor_task(void* params) {
     int16_t* data = NULL;
-    // UBaseType_t ringbuff_waiting_bytes_count = 0;
+
     size_t actual_halfwords_count = 0;
     size_t actual_bytes_count = 0;
 
     int16_t receiver_buffer[RECEIVER_SAMPLES_COUNT] = {0};
-    size_t remaining_halfwords_count = RECEIVER_SAMPLES_COUNT; // * sizeof(int16_t)
+    size_t remaining_halfwords_count = RECEIVER_SAMPLES_COUNT;
     size_t receiver_buffer_idx = 0;
 
     int32_t real_duration = 0;
     int64_t last_time = esp_timer_get_time();
-
-    // float* fft_buff = (float *)calloc(1, RECEIVER_SAMPLES_COUNT * sizeof(float)); //*2
-
-    // assert(fft_buff != NULL);
 
     int some_couner = 0;
 
@@ -189,18 +213,6 @@ static void gsampler_processor_task(void* params) {
             ESP_LOGV(TAG, "data=%d..%d, remaining_halfwords_count=%u, actual_halfwords_count=%u, target=%u", 
                 data[0], data[actual_halfwords_count - 1], remaining_halfwords_count, actual_halfwords_count, RECEIVER_SAMPLES_COUNT);
             
-
-
-            // if(++some_couner > 25) {
-            //     some_couner = 0;
-            //     printf("data_size = %u\n", actual_halfwords_count);
-            //     printf("data = [");
-            //     for(int i=0; i<actual_halfwords_count; ++i) {
-            //         printf("%d%s", data[i], i < (actual_halfwords_count - 1) ? ", " : "]\n");
-            //     }
-            // }
-
-            // memcpy((void*)(receiver_buffer + 0), (void*)data, actual_bytes_count);
             memcpy((void*)(receiver_buffer + receiver_buffer_idx), (void*)data, actual_bytes_count);
             receiver_buffer_idx += actual_halfwords_count;
             remaining_halfwords_count -= actual_halfwords_count;
@@ -208,14 +220,6 @@ static void gsampler_processor_task(void* params) {
 
             if (remaining_halfwords_count == 0) {
                 /* Got enough */
-                
-                // if(++some_couner > 25) {
-                //     some_couner = 0;
-                //     printf("data = [");
-                //     for(int i=0; i<RECEIVER_SAMPLES_COUNT; ++i) {
-                //         printf("%d%s", receiver_buffer[i], i < (RECEIVER_SAMPLES_COUNT - 1) ? ", " : "]\n");
-                //     }
-                // }
 
                 const int64_t recent_time = esp_timer_get_time();
                 real_duration = (int32_t)((recent_time - last_time) / 1000);
@@ -233,10 +237,11 @@ static void gsampler_processor_task(void* params) {
 
                 if(++some_couner > 25) {
                     some_couner = 0;
-                    printf("fft_res = [");
-                    for(int i=0; i<FFT_RESULT_SAMPLES_COUNT; ++i) {
-                        printf("%.2f%s", fft_complex_workspace[i], i < (FFT_RESULT_SAMPLES_COUNT - 1) ? ", " : "]\n");
-                    }
+                    fft_printf(RECEIVER_SAMPLES_COUNT, fft_complex_workspace, fft_max_freq.ampl);
+                    // printf("fft_res = [");
+                    // for(int i=0; i<FFT_RESULT_SAMPLES_COUNT; ++i) {
+                    //     printf("%.2f%s", fft_complex_workspace[i], i < (FFT_RESULT_SAMPLES_COUNT - 1) ? ", " : "]\n");
+                    // }
                 }
 
                 receiver_buffer_idx = 0;
