@@ -21,6 +21,8 @@ static RingbufHandle_t ringbuff_handle;
 __attribute__((aligned(16))) float window_time_domain[RECEIVER_SAMPLES_COUNT];
 __attribute__((aligned(16))) float fft_complex_workspace[RECEIVER_SAMPLES_COUNT * 2];
 
+__attribute__((aligned(16))) float fft_bins[FFT_BINS_COUNT];
+
 typedef struct freq_ampl_t {
     size_t idx;
     float freq;
@@ -49,48 +51,31 @@ static freq_ampl_t fft_get_max_freq(float* fft_result, const size_t fft_real_sam
     return result;
 }
 
-static void fft_printf(const size_t data_samples_count, float *fft_buff, float max_value) {
-    (void)max_value;
-    float bins[FFT_PRINTF_BINS_COUNT] = {0};
-    int16_t heights[FFT_PRINTF_BINS_COUNT];
-    const int16_t values_per_bin = data_samples_count / FFT_PRINTF_BINS_COUNT; // 2048 / 64 = 32
-    assert(data_samples_count == (values_per_bin * FFT_PRINTF_BINS_COUNT));
-
-    // int idx = 0;
-
-    for(int i=0; i<data_samples_count; ++i) {
-        bins[i / values_per_bin] += fft_buff[i];
+static void fft_fill_bins(float fft_result[FFT_RESULT_SAMPLES_COUNT], float fft_dst_bins[FFT_BINS_COUNT]) {
+    for(int i=0; i<FFT_RESULT_SAMPLES_COUNT; ++i) {
+        fft_dst_bins[i / FFT_SAMPLES_PER_BIN] += fft_result[i];
     }
-
-    int16_t max_height = 0;
-    for(int i=0; i<FFT_PRINTF_BINS_COUNT; ++i) {
-        heights[i] = (int16_t)(1.0F * bins[i] / (float)values_per_bin);
-        if(heights[i] > FFT_MAX_HEIGHT) {
-            heights[i] = FFT_MAX_HEIGHT;
-        }
-
-        if(heights[i] > max_height) {
-            max_height = heights[i];
-        }
+    for(int i=0; i<FFT_BINS_COUNT; ++i) {
+        fft_dst_bins[i] *= FFT_BINS_FACTOR;
     }
+}
 
+static void fft_printf(const float fft_printf_bins[FFT_BINS_COUNT]) {
     /* Draw graph */
     for(int iy=0; iy<FFT_PRINTF_HEIGHT; ++iy) {
-        const int height_threshold = FFT_PRINTF_HEIGHT - iy - 1;
+        const int height_threshold = FFT_PRINTF_HEIGHT - iy - 1 + 1;
 
-        for(int ix=0; ix<FFT_PRINTF_BINS_COUNT; ++ix) {
-            const int16_t height_value = heights[ix];
+        for(int ix=0; ix<FFT_BINS_COUNT; ++ix) {
+            const int16_t height_value = (int16_t)fft_printf_bins[ix];
             printf("%s", height_value >= height_threshold ? "|" : " ");
         }
         printf("\n");
     }
 
-    for(int ix=0; ix<FFT_PRINTF_BINS_COUNT; ++ix) {
+    for(int ix=0; ix<FFT_BINS_COUNT; ++ix) {
         printf("_");
     }
     printf("\n");
-    printf("max_val=%.3f, max_height=%d\n", max_value, max_height);
-
 }
 
 static void fft_process(int16_t *data, const size_t data_samples_count, float *out_buff) {
@@ -98,6 +83,8 @@ static void fft_process(int16_t *data, const size_t data_samples_count, float *o
     assert(out_buff);
     assert(data_samples_count == RECEIVER_SAMPLES_COUNT);
     
+//todo remove DC offset
+
     for (int i = 0 ; i < data_samples_count ; i++) {
         out_buff[i] = ((float)data[i]) * window_time_domain[i];
         // out_buff[i] = out_buff[i] / INT16_MAX;
@@ -233,6 +220,7 @@ static void gsampler_processor_task(void* params) {
                 last_time = recent_time;
                 fft_process(receiver_buffer, RECEIVER_SAMPLES_COUNT, fft_complex_workspace);
                 const freq_ampl_t fft_max_freq = fft_get_max_freq(fft_complex_workspace, FFT_RESULT_SAMPLES_COUNT);
+                fft_fill_bins(fft_complex_workspace, fft_bins);
 
                 ESP_LOGI(TAG, "Got %u samples, recev_buff=%d..%d, dur=%ld/%ldms, fft=[%.2f, %.2f, %.2f, %.2f], max=%.2fHz/%.2f.", 
                     receiver_buffer_idx,
@@ -244,7 +232,7 @@ static void gsampler_processor_task(void* params) {
 
                 if(++some_couner > 25) {
                     some_couner = 0;
-                    fft_printf(RECEIVER_SAMPLES_COUNT, fft_complex_workspace, fft_max_freq.ampl);
+                    fft_printf(fft_bins);
                     printf("fft_res = [");
                     for(int i=0; i<FFT_RESULT_SAMPLES_COUNT; ++i) {
                         printf("%.2f%s", fft_complex_workspace[i], i < (FFT_RESULT_SAMPLES_COUNT - 1) ? ", " : "]\n");

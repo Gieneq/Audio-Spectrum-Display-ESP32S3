@@ -18,6 +18,7 @@ extern "C" {
 #define MIC_RECORDING_SAMPLE_RATE     (16000U)
 
 #define RECEIVER_SAMPLES_COUNT (2 * 1024U)
+#define FFT_RESULT_SAMPLES_COUNT (RECEIVER_SAMPLES_COUNT / 2)
 #define RECEIVER_SAMPLING_DURATION_MS ((int32_t)(1000.0F*((float)RECEIVER_SAMPLES_COUNT)/((float)MIC_RECORDING_SAMPLE_RATE)))
 
 #define FFT_RESULT_SAMPLES_COUNT (RECEIVER_SAMPLES_COUNT / 2)
@@ -28,9 +29,13 @@ extern "C" {
 #define FFT_GAIN    (10.0f)
 #define FFT_THRSH   (42.0f)
 
+#define FFT_BINS_FACTOR   (0.05f)
+
 #define FFT_MAX_HEIGHT          (50)
 
-#define FFT_PRINTF_BINS_COUNT   (64 * 2)
+#define FFT_BINS_COUNT   (64)
+#define FFT_SAMPLES_PER_BIN  (FFT_RESULT_SAMPLES_COUNT / FFT_BINS_COUNT)
+
 #define FFT_PRINTF_HEIGHT       (16)
 
 esp_err_t gsampler_inti();
