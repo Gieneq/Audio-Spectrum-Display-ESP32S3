@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define DISPL_TOTAL_WIDTH   (320)
 #define DISPL_TOTAL_HEIGHT  (240)
 
@@ -27,3 +31,7 @@
 
 #define VIS_BLOCK_OFF_COLOR     GREV(0x4a49U)
 #define VIS_DISPLAY_BG_COLOR    GREV(0x2104U)
+
+#ifdef __cplusplus
+}
+#endif

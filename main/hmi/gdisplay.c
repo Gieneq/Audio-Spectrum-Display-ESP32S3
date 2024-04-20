@@ -5,8 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
-#include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/event_groups.h"
+#include "freertos/semphr.h"
 #include "esp_system.h"
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
@@ -17,6 +18,7 @@
 #include "esp_timer.h"
 
 #include "styles.h"
+#include "gdisplay_tools.h"
 
 static const char TAG[] = "GDisplay";
 
@@ -25,6 +27,7 @@ static const char TAG[] = "GDisplay";
 #define DISPLAY_WIDTH   320
 #define DISPLAY_HEIGHT  240
 #define CHUNK_LINES     48
+#define CHUNK_PIXELS_COUNT (CHUNK_LINES * DISPLAY_WIDTH)
 #define CHUNKS_COUNT    (DISPLAY_HEIGHT / CHUNK_LINES)
 #if CHUNKS_COUNT * CHUNK_LINES != DISPLAY_HEIGHT
 #error "Parallel lines count not equali diving display height"
@@ -46,6 +49,16 @@ static const char TAG[] = "GDisplay";
 static spi_device_handle_t spi;
 static uint16_t* display_buffer;
 
+static gdisplay_api_context_t gdisplay_context;
+static gdisplay_api_t gdisplay_api;
+
+#define OPEN_ACCESS_BIT (1UL << 0)
+static EventGroupHandle_t display_event_group;
+
+static SemaphoreHandle_t display_mutex;
+
+static SemaphoreHandle_t display_usage_count;
+
 typedef struct {
     uint8_t cmd;
     uint8_t data[16];
@@ -61,6 +74,12 @@ static void lcd_spi_pre_transfer_callback(spi_transaction_t *t);
 static uint32_t lcd_get_id(spi_device_handle_t spi);
 
 static void gdisplay_task(void* params);
+
+/* Tools */
+
+static void gdisplay_draw_pixel(uint16_t x, uint16_t y, uint16_t color) {
+    draw_pixel_onto_displaybuffer(&gdisplay_context, x, y, color);
+}
 
 //Place data into DRAM. Constant data gets placed into DROM by default, which is not accessible by DMA.
 DRAM_ATTR static const lcd_init_cmd_t st_init_cmds[] = {
@@ -96,7 +115,6 @@ DRAM_ATTR static const lcd_init_cmd_t st_init_cmds[] = {
     {0x29, {0}, 0x80},
     {0, {0}, 0xff}
 };
-
 
 /* Send a command to the LCD. Uses spi_device_polling_transmit, which waits
  * until the transfer is complete.
@@ -169,8 +187,6 @@ static uint32_t lcd_get_id(spi_device_handle_t spi) {
     return *(uint32_t*)t.rx_data;
 }
 
-
-
 /* To send a set of lines we have to send a command, 2 data bytes, another command, 2 more data bytes and another command
  * before sending the line data itself; a total of 6 transactions. (We can't put all of this in just one transaction
  * because the D/C line needs to be toggled in the middle.)
@@ -227,8 +243,7 @@ static void send_lines(spi_device_handle_t spi, int ypos, uint16_t *linedata) {
     //send_line_finish, which will wait for the transfers to be done and check their status.
 }
 
-static void send_line_finish(spi_device_handle_t spi)
-{
+static void send_line_finish(spi_device_handle_t spi) {
     spi_transaction_t *rtrans;
     esp_err_t ret;
     //Wait for all 6 transactions to be done and get back the results.
@@ -240,8 +255,7 @@ static void send_line_finish(spi_device_handle_t spi)
 }
 
 //Initialize the display
-void lcd_init(spi_device_handle_t spi)
-{
+void lcd_init(spi_device_handle_t spi) {
     int cmd = 0;
     const lcd_init_cmd_t* lcd_init_cmds;
 
@@ -280,7 +294,14 @@ void lcd_init(spi_device_handle_t spi)
 }
 
 static void update_draw_buffer() {
-    memset(display_buffer, 0xDD, DISPLAY_PIXELS_COUNT * sizeof(uint16_t));
+    memset(display_buffer, 0xFF, DISPLAY_PIXELS_COUNT * sizeof(uint16_t));
+
+    xEventGroupSetBits(display_event_group, OPEN_ACCESS_BIT);
+    taskYIELD();
+
+    while (uxSemaphoreGetCount(display_usage_count) > 0) {
+        vTaskDelay(1);  // Delay for a tick to allow other tasks to run
+    }
 }
 
 static void gdisplay_task(void* params) {
@@ -331,7 +352,7 @@ static void gdisplay_task(void* params) {
         sending_time += updating_time; 
 
         for(size_t chunk_idx = 0; chunk_idx < CHUNKS_COUNT; ++chunk_idx) {
-            const size_t offset = 0;
+            const size_t offset = chunk_idx * CHUNK_PIXELS_COUNT;
 
             start_sending_time = esp_timer_get_time();
             send_lines(spi, chunk_idx * CHUNK_LINES, display_buffer + offset);
@@ -374,10 +395,22 @@ static void gdisplay_task(void* params) {
 esp_err_t gdisplay_lcd_init(void) {
     ESP_LOGI(TAG, "GDisplay initializing...");
 
+    display_event_group = xEventGroupCreate();
+
+    display_mutex = xSemaphoreCreateMutex();
+
+    display_usage_count = xSemaphoreCreateCounting(255, 0);
+
     display_buffer = heap_caps_malloc(DISPLAY_PIXELS_COUNT * sizeof(uint16_t), MALLOC_CAP_DMA);
     assert(display_buffer);
 
-    memset(display_buffer, 0, DISPLAY_PIXELS_COUNT * sizeof(uint16_t));
+    memset(display_buffer, 0xFF, DISPLAY_PIXELS_COUNT * sizeof(uint16_t));
+
+    gdisplay_context.display_buffer = display_buffer;
+    gdisplay_context.display_width = DISPLAY_WIDTH;
+    gdisplay_context.display_height = DISPLAY_HEIGHT;
+
+    gdisplay_api.draw_pixel = gdisplay_draw_pixel;
 
     esp_err_t ret;
     spi_bus_config_t buscfg = {
@@ -410,11 +443,32 @@ esp_err_t gdisplay_lcd_init(void) {
         "gdisplay_task", 
         1024 * 8, 
         NULL, 
-        10, 
+        20, 
         NULL
     ) == pdTRUE;
     ESP_RETURN_ON_FALSE(display_task_was_created, ESP_FAIL, TAG, "Failed creating \'display_task\'!");
 
     ESP_LOGI(TAG, "GDisplay init success!");
     return ESP_OK;
+}
+
+bool display_api_await_access(gdisplay_api_t** gd_api, TickType_t timeout) {
+    EventBits_t bits;
+    // Wait for the OPEN_ACCESS bit to be set in the event group
+    bits = xEventGroupWaitBits(display_event_group, OPEN_ACCESS_BIT, pdTRUE, pdFALSE, timeout);
+
+    if ((bits & OPEN_ACCESS_BIT) != 0) {
+        // Try to take the mutex within the specified timeout
+        if (xSemaphoreTake(display_mutex, timeout) == pdTRUE) {
+            *gd_api = &gdisplay_api;  // Provide the display interface pointer
+            xSemaphoreGive(display_usage_count);
+            return true;
+        }
+    }
+    return false;  // Failed to take mutex or OPEN_ACCESS_BIT was not set
+}
+
+void display_api_release() {
+    xSemaphoreGive(display_mutex);
+    xSemaphoreTake(display_usage_count, portMAX_DELAY);
 }

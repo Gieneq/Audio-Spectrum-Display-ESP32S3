@@ -58,25 +58,17 @@ void app_main(void) {
     ret = gdisplay_lcd_init();
     ESP_ERROR_CHECK(ret);
 
-    // int16_t cnt = 0;
     while(1) {
-        // model_interface_t* model_if = NULL;
-        // if(display_access_model(&model_if, portMAX_DELAY)) {
-        //     model_if->set_bar_heights(NULL, 0);
-        //     display_release_model();
-        // }
-        vTaskDelay(1);
+        gdisplay_api_t* display_api = NULL;
+
+        if(display_api_await_access(&display_api, portMAX_DELAY)) {
+            for(int ix=0 ;ix<320; ++ix) {
+                for(int iy=0 ;iy<240; ++iy) {
+                    display_api->draw_pixel(ix,iy, 0x1111);
+                }
+            }
+            display_api_release();
+        }
+        // vTaskDelay(1);
     }
 }
-
-        // if(!was_drawn) {
-        //     const esp_err_t draw_ret = display_draw_custom(NULL);
-        //     if(draw_ret != ESP_OK) {
-        //         ESP_LOGW(TAG, "Draw failed! ret=%d.", draw_ret);
-        //     }
-        // }
-        //         was_drawn = true;
-        //         const esp_err_t draw_ret = display_draw_custom(fft_bins);
-        //         if(draw_ret != ESP_OK) {
-        //             ESP_LOGW(TAG, "Draw failed! ret=%d.", draw_ret);
-        //         }

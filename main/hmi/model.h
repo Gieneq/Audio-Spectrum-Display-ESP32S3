@@ -1,16 +1,10 @@
-// /*
-//  * SPDX-FileCopyrightText: 2023 Espressif Systems (Shanghai) CO LTD
-//  *
-//  * SPDX-License-Identifier: Unlicense OR CC0-1.0
-//  */
+#pragma once
 
-// #pragma once
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-// #ifdef __cplusplus
-// extern "C" {
-// #endif
-
-// #include "esp_err.h"
+#include "esp_err.h"
 
 
 // typedef struct model_interface_t {
@@ -31,6 +25,6 @@
 //  */
 // esp_err_t display_lcd_init(void);
 
-// #ifdef __cplusplus
-// }
-// #endif
+#ifdef __cplusplus
+}
+#endif
