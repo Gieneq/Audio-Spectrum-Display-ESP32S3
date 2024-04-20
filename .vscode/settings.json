@@ -20,6 +20,14 @@
         "freertos.h": "c",
         "task.h": "c",
         "bsp.h": "c",
-        "inttypes.h": "c"
+        "inttypes.h": "c",
+        "esp_lcd_panel_interface.h": "c",
+        "esp_lcd_panel_vendor.h": "c",
+        "esp_lcd_panel_io.h": "c",
+        "esp_check.h": "c",
+        "sdkconfig.h": "c",
+        "gsampler.h": "c",
+        "event_groups.h": "c",
+        "styles.h": "c"
     }
 }

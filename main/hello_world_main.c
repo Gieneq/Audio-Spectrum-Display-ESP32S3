@@ -13,6 +13,8 @@
 #include "esp_flash.h"
 #include "esp_log.h"
 
+#include "display.h"
+
 #include "gsampler.h"
 
 static const char TAG[] = "Main";
@@ -51,7 +53,28 @@ void app_main(void) {
     esp_err_t ret = gsampler_inti();
     ESP_ERROR_CHECK(ret);
 
+    ret = display_lcd_init();
+    ESP_ERROR_CHECK(ret);
+
+    int16_t cnt = 0;
     while(1) {
+        model_interface_t* model_if = NULL;
+        if(display_access_model(&model_if, portMAX_DELAY)) {
+            model_if->set_bar_heights(NULL, 0);
+            display_release_model();
+        }
         vTaskDelay(1);
     }
 }
+
+        // if(!was_drawn) {
+        //     const esp_err_t draw_ret = display_draw_custom(NULL);
+        //     if(draw_ret != ESP_OK) {
+        //         ESP_LOGW(TAG, "Draw failed! ret=%d.", draw_ret);
+        //     }
+        // }
+        //         was_drawn = true;
+        //         const esp_err_t draw_ret = display_draw_custom(fft_bins);
+        //         if(draw_ret != ESP_OK) {
+        //             ESP_LOGW(TAG, "Draw failed! ret=%d.", draw_ret);
+        //         }

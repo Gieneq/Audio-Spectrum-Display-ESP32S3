@@ -13,7 +13,7 @@
 
 #include "esp_log.h"
 
-#include "display.h"
+#include "esp_check.h"
 
 static const char TAG[] = "Main";
 
@@ -199,10 +199,8 @@ static void gsampler_processor_task(void* params) {
     int64_t last_time = esp_timer_get_time();
 
     int some_couner = 0;
-        bool was_drawn = false;
 
     while(1) {
-        was_drawn = false;
         const size_t max_bytes_count_to_return = remaining_halfwords_count * sizeof(int16_t);
         data = (int16_t*)xRingbufferReceiveUpTo(ringbuff_handle, &actual_bytes_count, 1, max_bytes_count_to_return);
         actual_halfwords_count = actual_bytes_count / 2;
@@ -242,23 +240,12 @@ static void gsampler_processor_task(void* params) {
                 //         printf("%.2f%s", fft_complex_workspace[i], i < (FFT_RESULT_SAMPLES_COUNT - 1) ? ", " : "]\n");
                 //     }
                 // }
-                was_drawn = true;
-                const esp_err_t draw_ret = display_draw_custom(fft_bins);
-                if(draw_ret != ESP_OK) {
-                    ESP_LOGW(TAG, "Draw failed! ret=%d.", draw_ret);
-                }
 
                 receiver_buffer_idx = 0;
                 remaining_halfwords_count = RECEIVER_SAMPLES_COUNT;
             }
         }
 
-        if(!was_drawn) {
-            const esp_err_t draw_ret = display_draw_custom(NULL);
-            if(draw_ret != ESP_OK) {
-                ESP_LOGW(TAG, "Draw failed! ret=%d.", draw_ret);
-            }
-        }
     }
 }
 
@@ -267,40 +254,32 @@ esp_err_t gsampler_inti() {
     esp_err_t ret = ESP_OK;
 
     ringbuff_handle = xRingbufferCreate(RINGBUFFER_SIZE, RINGBUF_TYPE_BYTEBUF);
-    if(ringbuff_handle == NULL) {
-        ESP_LOGE(TAG, "Failed creating ringbuffer!");
-        ret = ESP_FAIL;
-    }
-
-    ret = esp_timer_init();
-    if(ret == ESP_ERR_NO_MEM) {
-        ESP_LOGE(TAG, "Failed initializing timer!");
-    }
-
-    ret = ESP_OK;
-
+    ESP_RETURN_ON_FALSE(ringbuff_handle, ESP_FAIL, TAG, "Failed creating ringbuffer!");
+    
     ret = dsps_fft2r_init_fc32(NULL, CONFIG_DSP_MAX_FFT_SIZE);
-    if (ret  != ESP_OK) {
-        ESP_LOGE(TAG, "Not possible to initialize FFT. Error = %i", ret);
-        return ret;
-    }
-
-    ret = display_lcd_init();
-        if (ret  != ESP_OK) {
-        ESP_LOGE(TAG, "Not possible to display_lcd_init. Error = %i", ret);
-        return ret;
-    }
+    ESP_RETURN_ON_ERROR(ret, TAG, "Not possible to initialize FFT.");
 
     dsps_wind_hann_f32(window_time_domain, RECEIVER_SAMPLES_COUNT);
-    
-    if(ret == ESP_OK) {
-        (void)xTaskCreate(gsampler_processor_task, "gsampler_processor_task", 1024 * 8, NULL, 10, NULL);
-        
-        (void)xTaskCreate(mic_sampler_task, "mic_sampler_task", 1024 * 16, NULL, 5, NULL);
-    }
 
-    if(ret == ESP_OK) {
-        ESP_LOGI(TAG, "Gsampler initialized successfully!");
-    }
+    const bool processor_task_was_created = xTaskCreate(
+        gsampler_processor_task, 
+        "gsampler_processor_task", 
+        1024 * 8, 
+        NULL, 
+        10, 
+        NULL
+    ) == pdTRUE;
+    ESP_RETURN_ON_FALSE(processor_task_was_created, ESP_FAIL, TAG, "Failed creating \'gsampler_processor_task\'!");
+    
+    const bool mic_sampler_task_was_created = xTaskCreate(
+        mic_sampler_task, 
+        "mic_sampler_task", 
+        1024 * 16, 
+        NULL, 
+        5, 
+        NULL
+    ) == pdTRUE;
+    ESP_RETURN_ON_FALSE(mic_sampler_task_was_created, ESP_FAIL, TAG, "Failed creating \'mic_sampler_task\'!");
+
     return ret;
 }

@@ -12,17 +12,15 @@ extern "C" {
 
 #include "esp_err.h"
 
-/**
- * @brief
- *
- * @param data FFT data
- * @return esp_err_t
- *         ESP_OK   Success
- *         ESP_FAIL Failed
- */
-esp_err_t display_draw(float *data);
 
-esp_err_t display_draw_custom(float *bins_values);
+typedef struct model_interface_t {
+    void (*set_bar_heights)(int16_t* bars, size_t bars_count);
+} model_interface_t;
+
+bool display_access_model(model_interface_t** model_if, TickType_t timeout_tick_time);
+
+void display_release_model();
+
 
 /**
  * @brief Init lcd
