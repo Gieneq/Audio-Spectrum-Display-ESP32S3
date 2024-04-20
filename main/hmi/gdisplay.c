@@ -13,6 +13,8 @@
 
 #include <math.h>
 #include "esp_log.h"
+#include "esp_check.h"
+#include "esp_timer.h"
 
 #include "styles.h"
 
@@ -20,24 +22,45 @@ static const char TAG[] = "GDisplay";
 
 #define LCD_HOST    SPI2_HOST
 
-#define PARALLEL_LINES 16
+#define DISPLAY_WIDTH   320
+#define DISPLAY_HEIGHT  240
+#define CHUNK_LINES     48
+#define CHUNKS_COUNT    (DISPLAY_HEIGHT / CHUNK_LINES)
+#if CHUNKS_COUNT * CHUNK_LINES != DISPLAY_HEIGHT
+#error "Parallel lines count not equali diving display height"
+#endif
+#define DISPLAY_PIXELS_COUNT    (DISPLAY_WIDTH * DISPLAY_HEIGHT)
+#define DISPLAY_PIXELS_PER_CHUNK  (DISPLAY_WIDTH * CHUNK_LINES)
 
-#define PIN_NUM_MISO -1//25
-#define PIN_NUM_MOSI 6//23
-#define PIN_NUM_CLK  7//19
-#define PIN_NUM_CS   5//22
+#define PIN_NUM_MISO    -1
+#define PIN_NUM_MOSI    6
+#define PIN_NUM_CLK     7
+#define PIN_NUM_CS      5
 
-#define PIN_NUM_DC   4//21
-#define PIN_NUM_RST  48//18
-#define PIN_NUM_BCKL 45//5
+#define PIN_NUM_DC      4
+#define PIN_NUM_RST     48
+#define PIN_NUM_BCKL    45
 
 #define LCD_BK_LIGHT_ON_LEVEL   0
+
+static spi_device_handle_t spi;
+static uint16_t* display_buffer;
 
 typedef struct {
     uint8_t cmd;
     uint8_t data[16];
     uint8_t databytes; //No of data in data; bit 7 = delay after set; 0xFF = end of cmds.
 } lcd_init_cmd_t;
+
+static void lcd_data(spi_device_handle_t spi, const uint8_t *data, int len);
+
+static void lcd_cmd(spi_device_handle_t spi, const uint8_t cmd, bool keep_cs_active);
+
+static void lcd_spi_pre_transfer_callback(spi_transaction_t *t);
+
+static uint32_t lcd_get_id(spi_device_handle_t spi);
+
+static void gdisplay_task(void* params);
 
 //Place data into DRAM. Constant data gets placed into DROM by default, which is not accessible by DMA.
 DRAM_ATTR static const lcd_init_cmd_t st_init_cmds[] = {
@@ -82,8 +105,7 @@ DRAM_ATTR static const lcd_init_cmd_t st_init_cmds[] = {
  * mode for higher speed. The overhead of interrupt transactions is more than
  * just waiting for the transaction to complete.
  */
-void lcd_cmd(spi_device_handle_t spi, const uint8_t cmd, bool keep_cs_active)
-{
+static void lcd_cmd(spi_device_handle_t spi, const uint8_t cmd, bool keep_cs_active) {
     esp_err_t ret;
     spi_transaction_t t;
     memset(&t, 0, sizeof(t));       //Zero out the transaction
@@ -104,8 +126,7 @@ void lcd_cmd(spi_device_handle_t spi, const uint8_t cmd, bool keep_cs_active)
  * mode for higher speed. The overhead of interrupt transactions is more than
  * just waiting for the transaction to complete.
  */
-void lcd_data(spi_device_handle_t spi, const uint8_t *data, int len)
-{
+static void lcd_data(spi_device_handle_t spi, const uint8_t *data, int len) {
     esp_err_t ret;
     spi_transaction_t t;
     if (len == 0) {
@@ -121,14 +142,12 @@ void lcd_data(spi_device_handle_t spi, const uint8_t *data, int len)
 
 //This function is called (in irq context!) just before a transmission starts. It will
 //set the D/C line to the value indicated in the user field.
-void lcd_spi_pre_transfer_callback(spi_transaction_t *t)
-{
+static void lcd_spi_pre_transfer_callback(spi_transaction_t *t) {
     int dc = (int)t->user;
     gpio_set_level(PIN_NUM_DC, dc);
 }
 
-uint32_t lcd_get_id(spi_device_handle_t spi)
-{
+static uint32_t lcd_get_id(spi_device_handle_t spi) {
     // When using SPI_TRANS_CS_KEEP_ACTIVE, bus must be locked/acquired
     spi_device_acquire_bus(spi, portMAX_DELAY);
 
@@ -159,8 +178,7 @@ uint32_t lcd_get_id(spi_device_handle_t spi)
  * sent faster (compared to calling spi_device_transmit several times), and at
  * the mean while the lines for next transactions can get calculated.
  */
-static void send_lines(spi_device_handle_t spi, int ypos, uint16_t *linedata)
-{
+static void send_lines(spi_device_handle_t spi, int ypos, uint16_t *linedata) {
     esp_err_t ret;
     int x;
     //Transaction descriptors. Declared static so they're not allocated on the stack; we need this memory even when this
@@ -190,11 +208,11 @@ static void send_lines(spi_device_handle_t spi, int ypos, uint16_t *linedata)
     trans[2].tx_data[0] = 0x2B;         //Page address set
     trans[3].tx_data[0] = ypos >> 8;    //Start page high
     trans[3].tx_data[1] = ypos & 0xff;  //start page low
-    trans[3].tx_data[2] = (ypos + PARALLEL_LINES - 1) >> 8; //end page high
-    trans[3].tx_data[3] = (ypos + PARALLEL_LINES - 1) & 0xff; //end page low
+    trans[3].tx_data[2] = (ypos + CHUNK_LINES - 1) >> 8; //end page high
+    trans[3].tx_data[3] = (ypos + CHUNK_LINES - 1) & 0xff; //end page low
     trans[4].tx_data[0] = 0x2C;         //memory write
     trans[5].tx_buffer = linedata;      //finally send the line data
-    trans[5].length = 320 * 2 * 8 * PARALLEL_LINES;  //Data length, in bits
+    trans[5].length = DISPLAY_WIDTH * sizeof(uint16_t) * 8 * CHUNK_LINES;  //Data length, in bits
     trans[5].flags = 0; //undo SPI_TRANS_USE_TXDATA flag
 
     //Queue all transactions.
@@ -218,80 +236,6 @@ static void send_line_finish(spi_device_handle_t spi)
         ret = spi_device_get_trans_result(spi, &rtrans, portMAX_DELAY);
         assert(ret == ESP_OK);
         //We could inspect rtrans now if we received any info back. The LCD is treated as write-only, though.
-    }
-}
-
-//This variable is used to detect the next frame.
-static int prev_frame = -1;
-
-//Instead of calculating the offsets for each pixel we grab, we pre-calculate the valueswhenever a frame changes, then re-use
-//these as we go through all the pixels in the frame. This is much, much faster.
-static int8_t xofs[320], yofs[240];
-static int8_t xcomp[320], ycomp[240];
-#define IMAGE_W 320
-uint16_t *pixels;
-static inline uint16_t get_bgnd_pixel(int x, int y)
-{
-    //Get color of the pixel on x,y coords
-    return 0xFE00;//(uint16_t) * (pixels + (y * IMAGE_W) + x);
-}
-void pretty_effect_calc_lines(uint16_t *dest, int line, int frame, int linect)
-{
-    if (frame != prev_frame) {
-        //We need to calculate a new set of offset coefficients. Take some random sines as offsets to make everything
-        //look pretty and fluid-y.
-        for (int x = 0; x < 320; x++) {
-            xofs[x] = sin(frame * 0.15 + x * 0.06) * 4;
-        }
-        for (int y = 0; y < 240; y++) {
-            yofs[y] = sin(frame * 0.1 + y * 0.05) * 4;
-        }
-        for (int x = 0; x < 320; x++) {
-            xcomp[x] = sin(frame * 0.11 + x * 0.12) * 4;
-        }
-        for (int y = 0; y < 240; y++) {
-            ycomp[y] = sin(frame * 0.07 + y * 0.15) * 4;
-        }
-        prev_frame = frame;
-    }
-    for (int y = line; y < line + linect; y++) {
-        for (int x = 0; x < 320; x++) {
-            *dest++ = get_bgnd_pixel(x + yofs[y] + xcomp[x], y + xofs[x] + ycomp[y]);
-        }
-    }
-}
-
-static void display_pretty_colors(spi_device_handle_t spi)
-{
-    uint16_t *lines[2];
-    //Allocate memory for the pixel buffers
-    for (int i = 0; i < 2; i++) {
-        lines[i] = heap_caps_malloc(320 * PARALLEL_LINES * sizeof(uint16_t), MALLOC_CAP_DMA);
-        assert(lines[i] != NULL);
-    }
-    int frame = 0;
-    //Indexes of the line currently being sent to the LCD and the line we're calculating.
-    int sending_line = -1;
-    int calc_line = 0;
-
-    while (1) {
-        frame++;
-        for (int y = 0; y < 240; y += PARALLEL_LINES) {
-            //Calculate a line.
-            pretty_effect_calc_lines(lines[calc_line], y, frame, PARALLEL_LINES);
-            //Finish up the sending process of the previous line, if any
-            if (sending_line != -1) {
-                send_line_finish(spi);
-            }
-            //Swap sending_line and calc_line
-            sending_line = calc_line;
-            calc_line = (calc_line == 1) ? 0 : 1;
-            //Send the line we currently calculated.
-            send_lines(spi, y, lines[sending_line]);
-            //The line set is queued up for sending now; the actual sending happens in the
-            //background. We can go on to calculate the next line set as long as we do not
-            //touch line[sending_line]; the SPI sending process is still reading from that.
-        }
     }
 }
 
@@ -335,21 +279,117 @@ void lcd_init(spi_device_handle_t spi)
     gpio_set_level(PIN_NUM_BCKL, LCD_BK_LIGHT_ON_LEVEL);
 }
 
+static void update_draw_buffer() {
+    memset(display_buffer, 0xDD, DISPLAY_PIXELS_COUNT * sizeof(uint16_t));
+}
+
+static void gdisplay_task(void* params) {
+    
+    uint64_t start_updating_time;
+    uint64_t end_updating_time;
+    uint64_t updating_time;
+
+    uint64_t start_sending_time;
+    uint64_t end_sending_time;
+
+    uint64_t sending_time;
+    uint64_t chunk_sending_time;
+
+    uint64_t start_draw_time;
+    uint64_t end_draw_time;
+    uint64_t draw_time;
+
+    uint64_t total_sending_time = 0;
+    uint64_t total_draw_time = 0;
+    
+    uint64_t start_measurement_time;
+    uint64_t end_measurement_time;
+    uint64_t total_measurement_time;
+
+
+    const size_t measure_interval = 20;
+    size_t measure_counter = 0;
+
+    float fps;
+    float usage;
+    uint32_t draw_time_ms;
+    
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    const TickType_t target_interval_refresh_ticks = (40) / 10; 
+
+    start_measurement_time = esp_timer_get_time();
+
+    while(1) {
+        start_draw_time = esp_timer_get_time();
+        sending_time = 0;
+
+        start_updating_time = esp_timer_get_time();
+        update_draw_buffer();
+        end_updating_time = esp_timer_get_time();
+
+        updating_time = end_updating_time - start_updating_time;
+        sending_time += updating_time; 
+
+        for(size_t chunk_idx = 0; chunk_idx < CHUNKS_COUNT; ++chunk_idx) {
+            const size_t offset = 0;
+
+            start_sending_time = esp_timer_get_time();
+            send_lines(spi, chunk_idx * CHUNK_LINES, display_buffer + offset);
+            end_sending_time = esp_timer_get_time();
+            chunk_sending_time = end_sending_time - start_sending_time;
+            sending_time += chunk_sending_time;
+
+            send_line_finish(spi);
+        }
+        
+        /* Cap */
+        xTaskDelayUntil(&xLastWakeTime, target_interval_refresh_ticks);
+
+        end_draw_time = esp_timer_get_time();
+        draw_time = end_draw_time - start_draw_time;
+
+        total_draw_time += draw_time;
+        total_sending_time += sending_time;
+
+        if(measure_counter >= measure_interval) {
+            end_measurement_time = esp_timer_get_time();
+            total_measurement_time = end_measurement_time - start_measurement_time;
+
+            fps = ((float)measure_interval) / (((float)total_measurement_time) / 1000000.0F);
+            usage = 100.0F * ((float)total_sending_time) / ((float)total_measurement_time);
+            draw_time_ms = (uint32_t)(total_draw_time / measure_interval / 1000);
+
+            total_sending_time = 0;
+            total_draw_time = 0;
+
+            ESP_LOGI(TAG, "Draw: time=%lums, fps=%.3f, usage=%.1f", draw_time_ms, fps, usage);
+            measure_counter = 0;
+            
+            start_measurement_time = esp_timer_get_time();
+        }
+        ++measure_counter;
+    }
+}
+
 esp_err_t gdisplay_lcd_init(void) {
     ESP_LOGI(TAG, "GDisplay initializing...");
 
+    display_buffer = heap_caps_malloc(DISPLAY_PIXELS_COUNT * sizeof(uint16_t), MALLOC_CAP_DMA);
+    assert(display_buffer);
+
+    memset(display_buffer, 0, DISPLAY_PIXELS_COUNT * sizeof(uint16_t));
+
     esp_err_t ret;
-    spi_device_handle_t spi;
     spi_bus_config_t buscfg = {
         .miso_io_num = PIN_NUM_MISO,
         .mosi_io_num = PIN_NUM_MOSI,
         .sclk_io_num = PIN_NUM_CLK,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
-        .max_transfer_sz = PARALLEL_LINES * 320 * 2 + 8
+        .max_transfer_sz = CHUNK_LINES * DISPL_TOTAL_WIDTH * sizeof(uint16_t) + 8
     };
     spi_device_interface_config_t devcfg = {
-        .clock_speed_hz = 10 * 1000 * 1000,     //Clock out at 10 MHz
+        .clock_speed_hz = 40 * 1000 * 1000,     //Clock out at 10 MHz
         .mode = 0,                              //SPI mode 0
         .spics_io_num = PIN_NUM_CS,             //CS pin
         .queue_size = 7,                        //We want to be able to queue 7 transactions at a time
@@ -361,12 +401,19 @@ esp_err_t gdisplay_lcd_init(void) {
     //Attach the LCD to the SPI bus
     ret = spi_bus_add_device(LCD_HOST, &devcfg, &spi);
     ESP_ERROR_CHECK(ret);
+
     //Initialize the LCD
     lcd_init(spi);
 
-
-    //Go do nice stuff.
-    display_pretty_colors(spi);
+    const bool display_task_was_created = xTaskCreate(
+        gdisplay_task, 
+        "gdisplay_task", 
+        1024 * 8, 
+        NULL, 
+        10, 
+        NULL
+    ) == pdTRUE;
+    ESP_RETURN_ON_FALSE(display_task_was_created, ESP_FAIL, TAG, "Failed creating \'display_task\'!");
 
     ESP_LOGI(TAG, "GDisplay init success!");
     return ESP_OK;

@@ -15,7 +15,7 @@
 
 #include "gsampler.h"
 
-#include "gdisplay.h"
+#include "hmi/gdisplay.h"
 
 static const char TAG[] = "Main";
 

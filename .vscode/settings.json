@@ -29,6 +29,9 @@
         "gsampler.h": "c",
         "event_groups.h": "c",
         "styles.h": "c",
-        "gdisplay.h": "c"
+        "gdisplay.h": "c",
+        "spi_master.h": "c",
+        "spi_common.h": "c",
+        "compare": "c"
     }
 }
