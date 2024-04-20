@@ -1,13 +1,13 @@
 #pragma once
 
 #define DISPL_TOTAL_WIDTH   (320)
-#define DISPL_TOTAL_HEIGHT  (240 - 20)
+#define DISPL_TOTAL_HEIGHT  (240)
 
 #define VIS_BARS_COUNT      21
 #define VIS_ROWS_COUNT      19
 
 #define VIS_BLOCK_WIDTH     11
-#define VIS_BLOCK_HEIGHT    3
+#define VIS_BLOCK_HEIGHT    8
 
 #define VIS_BAR_HGAP        3
 #define VIS_BAR_VGAP        3

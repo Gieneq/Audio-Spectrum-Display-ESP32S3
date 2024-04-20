@@ -28,6 +28,7 @@
         "sdkconfig.h": "c",
         "gsampler.h": "c",
         "event_groups.h": "c",
-        "styles.h": "c"
+        "styles.h": "c",
+        "gdisplay.h": "c"
     }
 }
