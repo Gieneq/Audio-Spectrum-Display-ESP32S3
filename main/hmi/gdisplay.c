@@ -73,13 +73,13 @@ static void gdisplay_task(void* params);
 /* Tools */
 
 static void gdisplay_draw_pixel(uint16_t x, uint16_t y, uint16_t color) {
-    display_buffer[(DISPLAY_WIDTH - x - 1) + DISPLAY_WIDTH * y] = color;
+    display_buffer[x + DISPLAY_WIDTH * y] = color;
 }
 
 static void gdisplay_draw_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color) {
     for (uint16_t iy = 0; iy < h; iy++) {
         for (uint16_t ix = 0; ix < w; ix++) {
-            display_buffer[(DISPLAY_WIDTH -(x + ix) - 1) + DISPLAY_WIDTH * (y + iy)] = color;
+            display_buffer[(x + ix) + DISPLAY_WIDTH * (y + iy)] = color;
         }
     }
 }
@@ -106,7 +106,8 @@ static uint16_t gdisplay_get_display_height() {
 //Place data into DRAM. Constant data gets placed into DROM by default, which is not accessible by DMA.
 DRAM_ATTR static const lcd_init_cmd_t st_init_cmds[] = {
     /* Memory Data Access Control, MX=MV=1, MY=ML=MH=0, RGB=0 */
-    {0x36, {(1 << 5) | (1 << 6)}, 1},
+    // {0x36, {0x40 | 0x80}, 1},
+    {0x36, {(1 << 5) | (1 << 6) | 0x40 | 0x80}, 1}, //Note seems screen was fillped in X
     /* Interface Pixel Format, 16bits/pixel for RGB/MCU interface */
     {0x3A, {0x55}, 1},
     /* Porch Setting */
