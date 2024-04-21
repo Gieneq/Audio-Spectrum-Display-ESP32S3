@@ -36,7 +36,7 @@ static const char TAG[] = "GDisplay";
 #endif
 #define DISPLAY_PIXELS_COUNT    (DISPLAY_WIDTH * DISPLAY_HEIGHT)
 #define DISPLAY_PIXELS_PER_CHUNK  (DISPLAY_WIDTH * CHUNK_LINES)
-#define DISPLAY_TARGET_DRAW_INTERVAL  (50)
+#define DISPLAY_TARGET_DRAW_INTERVAL  (40)
 
 #define PIN_NUM_MISO    -1
 #define PIN_NUM_MOSI    6
@@ -406,7 +406,7 @@ static void gdisplay_task(void* params) {
             total_sending_time = 0;
             total_draw_time = 0;
 
-            ESP_LOGI(TAG, "Draw: time=%lums, fps=%.3f, usage=%.1f", draw_time_ms, fps, usage);
+            ESP_LOGV(TAG, "Draw: time=%lums, fps=%.3f, usage=%.1f", draw_time_ms, fps, usage);
             measure_counter = 0;
             
             start_measurement_time = esp_timer_get_time();

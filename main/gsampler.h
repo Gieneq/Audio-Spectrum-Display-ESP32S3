@@ -25,9 +25,9 @@ extern "C" {
 
 #define SAMPLE_IDX_TO_FREQ(_idx)      ( ((float)(MIC_RECORDING_SAMPLE_RATE/2)) * ((float)(_idx)) / ((float)(FFT_RESULT_SAMPLES_COUNT)) / 2.0F )
 
-#define FFT_OFFSET  (50.0f)
-#define FFT_GAIN    (10.0f)
-#define FFT_THRSH   (12.0f)
+// #define FFT_OFFSET  (50.0f)
+#define FFT_GAIN    (8.0f)
+#define FFT_THRSH   (0.02f)
 
 #define FFT_BINS_FACTOR   (0.15f)
 

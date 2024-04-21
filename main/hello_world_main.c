@@ -51,14 +51,24 @@ static void info_prints() {
 #define CONSTRAIN(_v, _min, _max) ((_v) < (_min) ? (_min) : ((_v) > (_max) ? (_max) : (_v)))
 
 static void process_results(float result[FFT_RESULT_SAMPLES_COUNT], float bins[FFT_BINS_COUNT]) {
+    // static int log_counter;
+
+    // if(++log_counter > 50) {
+    //     log_counter = 0;
+    //     printf("result = [");
+    //     for (size_t i = 0; i < FFT_RESULT_SAMPLES_COUNT; i++)
+    //     {
+    //         printf("%.2f, ", result[i]);
+    //     }
+    //     printf("]\n");
+    // }
 
     for(uint16_t col_idx = 0; col_idx < LED_MATRIX_COLUMNS; ++col_idx) {
-        const float raw_valuef = (bins[3*col_idx] + bins[3*col_idx + 1] + bins[3*col_idx + 2]) / 36;
+        const float raw_valuef = (bins[3*col_idx] + bins[3*col_idx + 1] + bins[3*col_idx + 2]) / 4;
         const uint16_t raw_value = raw_valuef < 0.0F ? 0 : (uint16_t)(raw_valuef);
-        const uint16_t col_height = CONSTRAIN(raw_value, 0U, LED_MATRIX_ROWS);
+        const uint16_t col_height = raw_value > LED_MATRIX_ROWS ? LED_MATRIX_ROWS : raw_value;
         led_matrix.columns_heights[col_idx] = col_height;
     }
-
 
     model_interface_t* model_if = NULL;
     if (model_interface_access(&model_if, portMAX_DELAY)) {
@@ -82,6 +92,6 @@ void app_main(void) {
     ESP_ERROR_CHECK(ret);
 
     while(1) {
-        vTaskDelay(1);
+        vTaskDelay(1000);
     }
 }

@@ -88,8 +88,7 @@ static void fft_process(int16_t *data, const size_t data_samples_count, float *o
 //todo remove DC offset
 
     for (int i = 0 ; i < data_samples_count ; i++) {
-        out_buff[i] = ((float)data[i]) * window_time_domain[i];
-        // out_buff[i] = out_buff[i] / INT16_MAX;
+        out_buff[i] = ((float)data[i]);// * window_time_domain[i];
     }
 
     dsps_fft2r_fc32(out_buff, data_samples_count);
@@ -98,16 +97,23 @@ static void fft_process(int16_t *data, const size_t data_samples_count, float *o
 
     for (int i = 0 ; i < (data_samples_count * 2) ; i++) {
         out_buff[i] = out_buff[i] / INT16_MAX;
-    }
-
-    for (int i = 0 ; i < data_samples_count; i++) {
-        out_buff[i] = FFT_OFFSET + FFT_GAIN * log10f(0.0000000000001 + out_buff[i * 2 + 0] * out_buff[i * 2 + 0] + out_buff[i * 2 + 1] * out_buff[i * 2 + 1]);
-    
-        /* Threshold */
         if(out_buff[i] < FFT_THRSH) {
             out_buff[i] = 0;
         }
+        out_buff[i] *= FFT_GAIN;
     }
+
+    // for (int i = 0 ; i < data_samples_count; i++) {
+    //     out_buff[i] = FFT_OFFSET + FFT_GAIN * log10f(0.0000000000001 + out_buff[i * 2 + 0] * out_buff[i * 2 + 0] + out_buff[i * 2 + 1] * out_buff[i * 2 + 1]);
+    
+    //     /* Threshold */
+    //     // if(out_buff[i] < FFT_THRSH) {
+    //     //     out_buff[i] = 0;
+    //     // }
+    // }
+    // for (int i = 0 ; i < data_samples_count; i++) {
+    //     out_buff[i] = log10f(0.0000000000001 + out_buff[i * 2 + 0] * out_buff[i * 2 + 0] + out_buff[i * 2 + 1] * out_buff[i * 2 + 1]);
+    // }
 }
 
 static void mic_sampler_task(void* params) {
@@ -233,14 +239,21 @@ static void gsampler_processor_task(void* params) {
                 );
 
                 result_processor(fft_complex_workspace, fft_bins);
-                // if(++some_couner > 25) {
-                //     some_couner = 0;
-                //     fft_printf(fft_bins);
-                //     printf("fft_res = [");
-                //     for(int i=0; i<FFT_RESULT_SAMPLES_COUNT; ++i) {
-                //         printf("%.2f%s", fft_complex_workspace[i], i < (FFT_RESULT_SAMPLES_COUNT - 1) ? ", " : "]\n");
-                //     }
-                // }
+                if(++some_couner > 50) {
+                    some_couner = 0;
+
+                    // fft_printf(fft_bins);
+
+                    // printf("samples = [");
+                    // for(int i=0; i<2048; ++i) {
+                    //     printf("%d%s", receiver_buffer[i], i < (2048 - 1) ? ", " : "]\n");
+                    // }
+
+                    // printf("fft_res = [");
+                    // for(int i=0; i<FFT_RESULT_SAMPLES_COUNT; ++i) {
+                    //     printf("%.2f%s", fft_complex_workspace[i], i < (FFT_RESULT_SAMPLES_COUNT - 1) ? ", " : "]\n");
+                    // }
+                }
 
                 receiver_buffer_idx = 0;
                 remaining_halfwords_count = RECEIVER_SAMPLES_COUNT;
