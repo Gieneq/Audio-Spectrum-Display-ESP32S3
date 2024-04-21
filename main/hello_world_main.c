@@ -19,6 +19,8 @@
 
 static const char TAG[] = "Main";
 
+static led_matrix_t led_matrix;
+
 static void info_prints() {
     /* Print chip information */
     esp_chip_info_t chip_info;
@@ -46,26 +48,40 @@ static void info_prints() {
     printf("Minimum free heap size: %" PRIu32 " bytes\n", esp_get_minimum_free_heap_size());
 }
 
+#define CONSTRAIN(_v, _min, _max) ((_v) < (_min) ? (_min) : ((_v) > (_max) ? (_max) : (_v)))
+
+static void process_results(float result[FFT_RESULT_SAMPLES_COUNT], float bins[FFT_BINS_COUNT]) {
+
+    for(uint16_t col_idx = 0; col_idx < LED_MATRIX_COLUMNS; ++col_idx) {
+        const float raw_valuef = (bins[3*col_idx] + bins[3*col_idx + 1] + bins[3*col_idx + 2]) / 36;
+        const uint16_t raw_value = raw_valuef < 0.0F ? 0 : (uint16_t)(raw_valuef);
+        const uint16_t col_height = CONSTRAIN(raw_value, 0U, LED_MATRIX_ROWS);
+        led_matrix.columns_heights[col_idx] = col_height;
+    }
+
+
+    model_interface_t* model_if = NULL;
+    if (model_interface_access(&model_if, portMAX_DELAY)) {
+        model_if->set_led_matrix_values(&led_matrix);
+        model_interface_release();
+    }
+}
+
 void app_main(void) {
     info_prints();
     ESP_LOGI(TAG, "Starting!");
+    
+    led_matrix_clear(&led_matrix);
 
     esp_err_t ret = ESP_OK;
 
-    ret = gsampler_inti();
+    ret = gsampler_inti(process_results);
     ESP_ERROR_CHECK(ret);
 
     ret = gdisplay_lcd_init();
     ESP_ERROR_CHECK(ret);
 
     while(1) {
-        
-        model_interface_t* model_if = NULL;
-        if (model_interface_access(&model_if, portMAX_DELAY)) {
-            model_if->set_bar_heights(NULL, 0);
-            model_interface_release();
-        }
-
         vTaskDelay(1);
     }
 }

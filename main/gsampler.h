@@ -38,7 +38,9 @@ extern "C" {
 
 #define FFT_PRINTF_HEIGHT       (16)
 
-esp_err_t gsampler_inti();
+typedef void(*results_processor_t)(float result[FFT_RESULT_SAMPLES_COUNT], float bins[FFT_BINS_COUNT]);
+
+esp_err_t gsampler_inti(results_processor_t result_proc);
 
 #ifdef __cplusplus
 }

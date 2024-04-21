@@ -18,7 +18,7 @@
 static const char TAG[] = "Main";
 
 static RingbufHandle_t ringbuff_handle;
-
+results_processor_t result_processor;
 
 __attribute__((aligned(16))) float window_time_domain[RECEIVER_SAMPLES_COUNT];
 __attribute__((aligned(16))) float fft_complex_workspace[RECEIVER_SAMPLES_COUNT * 2];
@@ -232,6 +232,7 @@ static void gsampler_processor_task(void* params) {
                     fft_max_freq.freq, fft_max_freq.ampl
                 );
 
+                result_processor(fft_complex_workspace, fft_bins);
                 // if(++some_couner > 25) {
                 //     some_couner = 0;
                 //     fft_printf(fft_bins);
@@ -250,8 +251,11 @@ static void gsampler_processor_task(void* params) {
 }
 
 
-esp_err_t gsampler_inti() {
+esp_err_t gsampler_inti(results_processor_t result_proc) {
     esp_err_t ret = ESP_OK;
+
+    result_processor = result_proc;
+    assert(result_processor);
 
     ringbuff_handle = xRingbufferCreate(RINGBUFFER_SIZE, RINGBUF_TYPE_BYTEBUF);
     ESP_RETURN_ON_FALSE(ringbuff_handle, ESP_FAIL, TAG, "Failed creating ringbuffer!");

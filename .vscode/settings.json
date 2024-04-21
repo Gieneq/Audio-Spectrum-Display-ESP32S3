@@ -36,6 +36,9 @@
         "gdisplay_tools.h": "c",
         "gdisplay_api.h": "c",
         "semphr.h": "c",
-        "model.h": "c"
+        "model.h": "c",
+        "string.h": "c",
+        "algorithm": "c",
+        "led_matrix.h": "c"
     }
 }

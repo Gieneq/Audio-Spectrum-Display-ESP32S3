@@ -9,11 +9,11 @@ extern "C" {
 #include "freertos/FreeRTOS.h"
 #include "esp_err.h"
 
+#include "../led_matrix.h"
 #include "gdisplay_api.h"
 
-
 typedef struct model_interface_t {
-    void (*set_bar_heights)(int16_t* bars, size_t bars_count);
+    void (*set_led_matrix_values)(const led_matrix_t* led_mx);
 } model_interface_t;
 
 bool model_interface_access(model_interface_t** model_if, TickType_t timeout_tick_time);
