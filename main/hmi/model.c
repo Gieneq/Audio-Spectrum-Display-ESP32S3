@@ -1,3 +1,110 @@
+#include "model.h"
+
+#include <string.h>
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
+
+#include "esp_log.h"
+#include "esp_check.h"
+
+#include "gstyles.h"
+
+static const char *TAG = "Model";
+
+static SemaphoreHandle_t model_mutex;
+
+
+typedef struct model_t {
+    model_interface_t interface;
+    int16_t bar_heights[VIS_BARS_COUNT];
+} model_t;
+
+static model_t* get_model();
+
+static void model_set_bar_heights(int16_t* bars, size_t bars_count);
+
+static void model_set_bar_heights(int16_t* bars, size_t bars_count) {
+    bars_count = bars_count > VIS_BARS_COUNT ? VIS_BARS_COUNT : bars_count;
+    memcpy(get_model()->bar_heights, bars, sizeof(bars[0]) * bars_count);
+
+    get_model()->bar_heights[0] = VIS_ROWS_COUNT - 1;
+    get_model()->bar_heights[1] = 3;
+    get_model()->bar_heights[2] = VIS_ROWS_COUNT - 5;
+    get_model()->bar_heights[3] = 8;
+}
+
+static model_t* get_model() {
+    static model_t _model;
+    static model_t* _model_ptr;
+    if(!_model_ptr) {
+        ESP_LOGI(TAG, "Model just created!");
+        _model_ptr = &_model;
+        _model.interface.set_bar_heights = model_set_bar_heights;
+        memset(_model.bar_heights, 0, sizeof(_model.bar_heights));
+    }
+    return _model_ptr;
+}
+
+bool model_interface_access(model_interface_t** model_if, TickType_t timeout_tick_time) {
+    const bool accessed = xSemaphoreTake(model_mutex, timeout_tick_time) == pdTRUE ? true : false;
+    *model_if = &get_model()->interface;
+    return accessed;
+}
+
+void model_interface_release() {
+    xSemaphoreGive(model_mutex);
+}
+
+void model_init() {
+    model_mutex = xSemaphoreCreateMutex();
+    assert(model_mutex);
+}
+
+void model_tick() {
+    model_interface_t* model_if = NULL;
+    if (model_interface_access(&model_if, portMAX_DELAY)) {
+        (void)model_if; //not needed, only lock recsources
+
+        //todo use bar heights
+
+        model_interface_release();
+    }
+
+}
+
+void model_draw(gdisplay_api_t* gd_api) {
+    gd_api->draw_rect(0, 0, DISPL_TOTAL_WIDTH, PANE_BOTTOM_HEIGHT, VIS_PANE_BOTTOM_BG_COLOR);
+    
+    gd_api->draw_rect(VIS_X, VIS_Y, VIS_DISPLAY_WIDTH, VIS_DISPLAY_HEIGHT, VIS_DISPLAY_BG_COLOR);
+
+    for(size_t row_idx = 0; row_idx < VIS_ROWS_COUNT; ++row_idx) {
+        for(size_t bar_idx = 0; bar_idx < VIS_BARS_COUNT; ++bar_idx) {
+            const bool bar_colored = get_model()->bar_heights[bar_idx] <= row_idx;
+            gd_api->draw_rect(
+                VIS_X + VIS_BAR_HGAP + bar_idx * (VIS_BLOCK_WIDTH  + VIS_BAR_HGAP),
+                VIS_Y + VIS_BAR_VGAP + row_idx * (VIS_BLOCK_HEIGHT + VIS_BAR_VGAP), 
+                VIS_BLOCK_WIDTH, 
+                VIS_BLOCK_HEIGHT, 
+                bar_colored ? VIS_BLOCK_ON_COLOR : VIS_BLOCK_OFF_COLOR
+            );
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 // #include <math.h>
 // #include "bsp/esp-bsp.h"
 // #include "bsp/display.h"
@@ -42,12 +149,6 @@
 // #endif
 
 
-// typedef struct model_t {
-//     model_interface_t interface;
-//     int16_t bar_heights[VIS_BARS_COUNT];
-// } model_t;
-
-// static model_t* get_model();
 
 // SemaphoreHandle_t model_mutex;
 

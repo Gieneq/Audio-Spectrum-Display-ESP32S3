@@ -33,6 +33,9 @@
         "spi_master.h": "c",
         "spi_common.h": "c",
         "compare": "c",
-        "gdisplay_tools.h": "c"
+        "gdisplay_tools.h": "c",
+        "gdisplay_api.h": "c",
+        "semphr.h": "c",
+        "model.h": "c"
     }
 }

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
 #include "freertos/semphr.h"
@@ -17,8 +18,9 @@
 #include "esp_check.h"
 #include "esp_timer.h"
 
-#include "styles.h"
-#include "gdisplay_tools.h"
+#include "gstyles.h"
+#include "gdisplay_api.h"
+#include "model.h"
 
 static const char TAG[] = "GDisplay";
 
@@ -34,6 +36,7 @@ static const char TAG[] = "GDisplay";
 #endif
 #define DISPLAY_PIXELS_COUNT    (DISPLAY_WIDTH * DISPLAY_HEIGHT)
 #define DISPLAY_PIXELS_PER_CHUNK  (DISPLAY_WIDTH * CHUNK_LINES)
+#define DISPLAY_TARGET_DRAW_INTERVAL  (50)
 
 #define PIN_NUM_MISO    -1
 #define PIN_NUM_MOSI    6
@@ -49,15 +52,7 @@ static const char TAG[] = "GDisplay";
 static spi_device_handle_t spi;
 static uint16_t* display_buffer;
 
-static gdisplay_api_context_t gdisplay_context;
 static gdisplay_api_t gdisplay_api;
-
-#define OPEN_ACCESS_BIT (1UL << 0)
-static EventGroupHandle_t display_event_group;
-
-static SemaphoreHandle_t display_mutex;
-
-static SemaphoreHandle_t display_usage_count;
 
 typedef struct {
     uint8_t cmd;
@@ -78,7 +73,34 @@ static void gdisplay_task(void* params);
 /* Tools */
 
 static void gdisplay_draw_pixel(uint16_t x, uint16_t y, uint16_t color) {
-    draw_pixel_onto_displaybuffer(&gdisplay_context, x, y, color);
+    display_buffer[(DISPLAY_WIDTH - x - 1) + DISPLAY_WIDTH * y] = color;
+}
+
+static void gdisplay_draw_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color) {
+    for (uint16_t iy = 0; iy < h; iy++) {
+        for (uint16_t ix = 0; ix < w; ix++) {
+            display_buffer[(DISPLAY_WIDTH -(x + ix) - 1) + DISPLAY_WIDTH * (y + iy)] = color;
+        }
+    }
+}
+
+
+static void gdisplay_fill_black() {
+    memset(display_buffer, 0, DISPLAY_PIXELS_COUNT * sizeof(uint16_t));
+}
+
+static void gdisplay_fill_color(uint16_t color) {
+    for(uint32_t pixel_idx = 0; pixel_idx < DISPLAY_PIXELS_COUNT; ++pixel_idx) {
+        display_buffer[pixel_idx] = color;
+    }
+}
+
+static uint16_t gdisplay_get_display_width() {
+    return DISPLAY_WIDTH;
+}
+
+static uint16_t gdisplay_get_display_height() {
+    return DISPLAY_HEIGHT;
 }
 
 //Place data into DRAM. Constant data gets placed into DROM by default, which is not accessible by DMA.
@@ -109,6 +131,8 @@ DRAM_ATTR static const lcd_init_cmd_t st_init_cmds[] = {
     {0xE0, {0xD0, 0x00, 0x05, 0x0E, 0x15, 0x0D, 0x37, 0x43, 0x47, 0x09, 0x15, 0x12, 0x16, 0x19}, 14},
     /* Negative Voltage Gamma Control */
     {0xE1, {0xD0, 0x00, 0x05, 0x0D, 0x0C, 0x06, 0x2D, 0x44, 0x40, 0x0E, 0x1C, 0x18, 0x16, 0x19}, 14},
+    //??//
+    // {0x21, {0}, 0},
     /* Sleep Out */
     {0x11, {0}, 0x80},
     /* Display On */
@@ -294,18 +318,16 @@ void lcd_init(spi_device_handle_t spi) {
 }
 
 static void update_draw_buffer() {
+    model_tick();
+
     memset(display_buffer, 0xFF, DISPLAY_PIXELS_COUNT * sizeof(uint16_t));
-
-    xEventGroupSetBits(display_event_group, OPEN_ACCESS_BIT);
-    taskYIELD();
-
-    while (uxSemaphoreGetCount(display_usage_count) > 0) {
-        vTaskDelay(1);  // Delay for a tick to allow other tasks to run
-    }
+    model_draw(&gdisplay_api);
 }
 
 static void gdisplay_task(void* params) {
     
+    model_init();
+
     uint64_t start_updating_time;
     uint64_t end_updating_time;
     uint64_t updating_time;
@@ -336,7 +358,7 @@ static void gdisplay_task(void* params) {
     uint32_t draw_time_ms;
     
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    const TickType_t target_interval_refresh_ticks = (40) / 10; 
+    const TickType_t target_interval_refresh_ticks = (DISPLAY_TARGET_DRAW_INTERVAL) / 10; 
 
     start_measurement_time = esp_timer_get_time();
 
@@ -395,22 +417,17 @@ static void gdisplay_task(void* params) {
 esp_err_t gdisplay_lcd_init(void) {
     ESP_LOGI(TAG, "GDisplay initializing...");
 
-    display_event_group = xEventGroupCreate();
-
-    display_mutex = xSemaphoreCreateMutex();
-
-    display_usage_count = xSemaphoreCreateCounting(255, 0);
-
     display_buffer = heap_caps_malloc(DISPLAY_PIXELS_COUNT * sizeof(uint16_t), MALLOC_CAP_DMA);
     assert(display_buffer);
 
-    memset(display_buffer, 0xFF, DISPLAY_PIXELS_COUNT * sizeof(uint16_t));
-
-    gdisplay_context.display_buffer = display_buffer;
-    gdisplay_context.display_width = DISPLAY_WIDTH;
-    gdisplay_context.display_height = DISPLAY_HEIGHT;
-
     gdisplay_api.draw_pixel = gdisplay_draw_pixel;
+    gdisplay_api.draw_rect = gdisplay_draw_rect;
+    gdisplay_api.fill_black = gdisplay_fill_black;
+    gdisplay_api.fill_color = gdisplay_fill_color;
+    gdisplay_api.get_display_width = gdisplay_get_display_width;
+    gdisplay_api.get_display_height = gdisplay_get_display_height;
+
+    gdisplay_api.fill_black();
 
     esp_err_t ret;
     spi_bus_config_t buscfg = {
@@ -419,7 +436,7 @@ esp_err_t gdisplay_lcd_init(void) {
         .sclk_io_num = PIN_NUM_CLK,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
-        .max_transfer_sz = CHUNK_LINES * DISPL_TOTAL_WIDTH * sizeof(uint16_t) + 8
+        .max_transfer_sz = CHUNK_LINES * DISPLAY_WIDTH * sizeof(uint16_t) + 8
     };
     spi_device_interface_config_t devcfg = {
         .clock_speed_hz = 40 * 1000 * 1000,     //Clock out at 10 MHz
@@ -450,25 +467,4 @@ esp_err_t gdisplay_lcd_init(void) {
 
     ESP_LOGI(TAG, "GDisplay init success!");
     return ESP_OK;
-}
-
-bool display_api_await_access(gdisplay_api_t** gd_api, TickType_t timeout) {
-    EventBits_t bits;
-    // Wait for the OPEN_ACCESS bit to be set in the event group
-    bits = xEventGroupWaitBits(display_event_group, OPEN_ACCESS_BIT, pdTRUE, pdFALSE, timeout);
-
-    if ((bits & OPEN_ACCESS_BIT) != 0) {
-        // Try to take the mutex within the specified timeout
-        if (xSemaphoreTake(display_mutex, timeout) == pdTRUE) {
-            *gd_api = &gdisplay_api;  // Provide the display interface pointer
-            xSemaphoreGive(display_usage_count);
-            return true;
-        }
-    }
-    return false;  // Failed to take mutex or OPEN_ACCESS_BIT was not set
-}
-
-void display_api_release() {
-    xSemaphoreGive(display_mutex);
-    xSemaphoreTake(display_usage_count, portMAX_DELAY);
 }

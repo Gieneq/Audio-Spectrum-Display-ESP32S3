@@ -14,8 +14,8 @@
 #include "esp_log.h"
 
 #include "gsampler.h"
-
-#include "hmi/gdisplay.h"
+#include "gdisplay.h"
+#include "model.h"
 
 static const char TAG[] = "Main";
 
@@ -59,16 +59,13 @@ void app_main(void) {
     ESP_ERROR_CHECK(ret);
 
     while(1) {
-        gdisplay_api_t* display_api = NULL;
-
-        if(display_api_await_access(&display_api, portMAX_DELAY)) {
-            for(int ix=0 ;ix<320; ++ix) {
-                for(int iy=0 ;iy<240; ++iy) {
-                    display_api->draw_pixel(ix,iy, 0x1111);
-                }
-            }
-            display_api_release();
+        
+        model_interface_t* model_if = NULL;
+        if (model_interface_access(&model_if, portMAX_DELAY)) {
+            model_if->set_bar_heights(NULL, 0);
+            model_interface_release();
         }
-        // vTaskDelay(1);
+
+        vTaskDelay(1);
     }
 }

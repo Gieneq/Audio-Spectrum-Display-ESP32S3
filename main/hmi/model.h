@@ -4,26 +4,27 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
+
+#include "freertos/FreeRTOS.h"
 #include "esp_err.h"
 
-
-// typedef struct model_interface_t {
-//     void (*set_bar_heights)(int16_t* bars, size_t bars_count);
-// } model_interface_t;
-
-// bool display_access_model(model_interface_t** model_if, TickType_t timeout_tick_time);
-
-// void display_release_model();
+#include "gdisplay_api.h"
 
 
-// /**
-//  * @brief Init lcd
-//  *
-//  * @return esp_err_t
-//  *         ESP_OK   Success
-//  *         ESP_FAIL Failed
-//  */
-// esp_err_t display_lcd_init(void);
+typedef struct model_interface_t {
+    void (*set_bar_heights)(int16_t* bars, size_t bars_count);
+} model_interface_t;
+
+bool model_interface_access(model_interface_t** model_if, TickType_t timeout_tick_time);
+
+void model_interface_release();
+
+void model_init();
+
+void model_tick();
+
+void model_draw(gdisplay_api_t* gd_api);
 
 #ifdef __cplusplus
 }
