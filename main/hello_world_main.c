@@ -64,7 +64,7 @@ static void process_results(float result[FFT_RESULT_SAMPLES_COUNT], float bins[F
     // }
 
     for(uint16_t col_idx = 0; col_idx < LED_MATRIX_COLUMNS; ++col_idx) {
-        const float raw_valuef = (bins[3*col_idx] + bins[3*col_idx + 1] + bins[3*col_idx + 2]) / 4;
+        const float raw_valuef = bins[col_idx];
         const uint16_t raw_value = raw_valuef < 0.0F ? 0 : (uint16_t)(raw_valuef);
         const uint16_t col_height = raw_value > LED_MATRIX_ROWS ? LED_MATRIX_ROWS : raw_value;
         led_matrix.columns_heights[col_idx] = col_height;

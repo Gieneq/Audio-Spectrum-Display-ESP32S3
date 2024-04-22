@@ -26,14 +26,14 @@ extern "C" {
 #define SAMPLE_IDX_TO_FREQ(_idx)      ( ((float)(MIC_RECORDING_SAMPLE_RATE/2)) * ((float)(_idx)) / ((float)(FFT_RESULT_SAMPLES_COUNT)) / 2.0F )
 
 // #define FFT_OFFSET  (50.0f)
-#define FFT_GAIN    (8.0f)
-#define FFT_THRSH   (0.02f)
+#define FFT_GAIN    (3.0f)
+#define FFT_THRSH   (0.2f)
 
-#define FFT_BINS_FACTOR   (0.15f)
+// #define FFT_BINS_FACTOR   (0.15f)
 
 #define FFT_MAX_HEIGHT          (50)
 
-#define FFT_BINS_COUNT   (64)
+#define FFT_BINS_COUNT   (21)
 #define FFT_SAMPLES_PER_BIN  (FFT_RESULT_SAMPLES_COUNT / FFT_BINS_COUNT)
 
 #define FFT_PRINTF_HEIGHT       (16)
