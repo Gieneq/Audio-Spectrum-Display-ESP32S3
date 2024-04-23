@@ -21,7 +21,9 @@ static RingbufHandle_t ringbuff_handle;
 results_processor_t result_processor;
 
 __attribute__((aligned(16))) float window_time_domain[RECEIVER_SAMPLES_COUNT];
-__attribute__((aligned(16))) float fft_complex_workspace[RECEIVER_SAMPLES_COUNT * 2];
+__attribute__((aligned(16))) float testsig[RECEIVER_SAMPLES_COUNT];
+__attribute__((aligned(16))) float fft_complex_workspace[FFT_WORKSPACE_BUFFER_SIZE];
+__attribute__((aligned(16))) float fft_result[FFT_RESULT_SAMPLES_COUNT];
 
 __attribute__((aligned(16))) float fft_bins[FFT_BINS_COUNT];
 
@@ -33,20 +35,19 @@ typedef struct freq_ampl_t {
     float ampl;
 } freq_ampl_t;
 
-static freq_ampl_t fft_get_max_freq(float* fft_result, const size_t fft_real_samples) {
+static freq_ampl_t fft_get_max_freq(float fft_res[FFT_RESULT_SAMPLES_COUNT]) {
     assert(fft_result);
-    assert(fft_real_samples > 1);
 
     freq_ampl_t result = {
         .idx=0,
         .freq=SAMPLE_IDX_TO_FREQ(0),
-        .ampl=fft_result[0]
+        .ampl=fft_res[0]
     };
 
-    for (int sample_idx = 1; sample_idx < fft_real_samples; sample_idx++) {
-        if (fft_result[sample_idx] > result.ampl) {
+    for (int sample_idx = 1; sample_idx < FFT_RESULT_SAMPLES_COUNT; sample_idx++) {
+        if (fft_res[sample_idx] > result.ampl) {
             result.idx = sample_idx;
-            result.ampl = fft_result[sample_idx];
+            result.ampl = fft_res[sample_idx];
         }
     }
 
@@ -55,70 +56,71 @@ static freq_ampl_t fft_get_max_freq(float* fft_result, const size_t fft_real_sam
     return result;
 }
 
-static void fft_fill_bins(float fft_result[FFT_RESULT_SAMPLES_COUNT], float fft_dst_bins[FFT_BINS_COUNT]) {
+static void fft_fill_bins(float fft_res[FFT_RESULT_SAMPLES_COUNT], float fft_dst_bins[FFT_BINS_COUNT]) {
     memset(fft_dst_bins, 0, sizeof(float) * FFT_BINS_COUNT);
 
     for(int i=0; i<FFT_RESULT_SAMPLES_COUNT; ++i) {
-        fft_dst_bins[bins_map[i]] += fft_result[i];
+        fft_dst_bins[bins_map[i]] += fft_res[i];
     }
 }
 
-static void fft_printf(const float fft_printf_bins[FFT_BINS_COUNT]) {
-    /* Draw graph */
-    for(int iy=0; iy<FFT_PRINTF_HEIGHT; ++iy) {
-        const int height_threshold = FFT_PRINTF_HEIGHT - iy - 1 + 1;
+// static void fft_printf(const float fft_printf_bins[FFT_BINS_COUNT]) {
+//     /* Draw graph */
+//     for(int iy=0; iy<FFT_PRINTF_HEIGHT; ++iy) {
+//         const int height_threshold = FFT_PRINTF_HEIGHT - iy - 1 + 1;
 
-        for(int ix=0; ix<FFT_BINS_COUNT; ++ix) {
-            const int16_t height_value = (int16_t)fft_printf_bins[ix];
-            printf("%s", height_value >= height_threshold ? "|" : " ");
-        }
-        printf("\n");
-    }
+//         for(int ix=0; ix<FFT_BINS_COUNT; ++ix) {
+//             const int16_t height_value = (int16_t)fft_printf_bins[ix];
+//             printf("%s", height_value >= height_threshold ? "|" : " ");
+//         }
+//         printf("\n");
+//     }
 
-    for(int ix=0; ix<FFT_BINS_COUNT; ++ix) {
-        printf("_");
-    }
-    printf("\n");
-}
+//     for(int ix=0; ix<FFT_BINS_COUNT; ++ix) {
+//         printf("_");
+//     }
+//     printf("\n");
+// }
 
-static void fft_process(int16_t *data, const size_t data_samples_count, float *out_buff) {
-    assert(data);
-    assert(out_buff);
-    assert(data_samples_count == RECEIVER_SAMPLES_COUNT);
-    
-//todo remove DC offset
 
-    for (int i = 0 ; i < data_samples_count ; i++) {
-        out_buff[i] = ((float)data[i]);// * window_time_domain[i];
-    }
+    // dsps_bit_rev_fc32(workspace, RECEIVER_SAMPLES_COUNT);
+        // workspace[i] = workspace[i] / INT16_MAX;
 
-    dsps_fft2r_fc32(out_buff, data_samples_count);
-
-    dsps_bit_rev_fc32(out_buff, data_samples_count);
-
-    for (int i = 0 ; i < (data_samples_count * 2) ; i++) {
-        out_buff[i] = out_buff[i] / INT16_MAX;
-    }
-
-    for (int i = 0 ; i < data_samples_count; i++) {
-        out_buff[i] = out_buff[i * 2 + 0] * out_buff[i * 2 + 0] + out_buff[i * 2 + 1] * out_buff[i * 2 + 1];
-        if(out_buff[i] < FFT_THRSH) {
-            out_buff[i] = 0;
-        }
-        out_buff[i] *= FFT_GAIN;
-    }
-
-    // for (int i = 0 ; i < data_samples_count; i++) {
-    //     out_buff[i] = FFT_OFFSET + FFT_GAIN * log10f(0.0000000000001 + out_buff[i * 2 + 0] * out_buff[i * 2 + 0] + out_buff[i * 2 + 1] * out_buff[i * 2 + 1]);
-    
-    //     /* Threshold */
-    //     // if(out_buff[i] < FFT_THRSH) {
-    //     //     out_buff[i] = 0;
-    //     // }
+static void fft_process(int16_t samples[RECEIVER_SAMPLES_COUNT], float workspace[FFT_WORKSPACE_BUFFER_SIZE], float fft_result[FFT_RESULT_SAMPLES_COUNT]) {
+    // for (size_t sample_idx = 0 ; sample_idx < RECEIVER_SAMPLES_COUNT; sample_idx++) {
+    //     // workspace[sample_idx] = ((float)samples[sample_idx]) / 4096.0F;
+    //     workspace[sample_idx] = ((float)samples[sample_idx]) / ((float)INT16_MAX);
     // }
-    // for (int i = 0 ; i < data_samples_count; i++) {
-    //     out_buff[i] = log10f(0.0000000000001 + out_buff[i * 2 + 0] * out_buff[i * 2 + 0] + out_buff[i * 2 + 1] * out_buff[i * 2 + 1]);
-    // }
+
+    dsps_wind_hann_f32(window_time_domain, RECEIVER_SAMPLES_COUNT);
+    // dsps_tone_gen_f32(testsig, RECEIVER_SAMPLES_COUNT, 1.0, 0.16,  0);
+
+
+    assert(FFT_WORKSPACE_BUFFER_SIZE == (RECEIVER_SAMPLES_COUNT * 2));
+    for (int i = 0; i < RECEIVER_SAMPLES_COUNT; i++) {
+        testsig[i] = ((float)samples[i]) / 4096.0F;
+        workspace[2 * i + 0] = testsig[i] * window_time_domain[i];
+        workspace[2 * i + 1] = 0;
+    }
+
+    dsps_fft2r_fc32(workspace, RECEIVER_SAMPLES_COUNT);
+
+    dsps_bit_rev_fc32(workspace, RECEIVER_SAMPLES_COUNT);
+    // Convert one complex vector to two complex vectors
+    dsps_cplx2reC_fc32(workspace, RECEIVER_SAMPLES_COUNT);
+
+    // The result of FFT is now in workspace arranged as interleaved real and imaginary parts.
+    // Calculate magnitudes and store them in fft_result
+    for (int i = 0; i < FFT_RESULT_SAMPLES_COUNT; i++) {
+        float real = workspace[2 * i];  // Real part at even indices
+        float imag = workspace[2 * i + 1];  // Imaginary part at odd indices
+
+        fft_result[i] = sqrtf(real * real + imag * imag);
+        if(fft_result[i] < FFT_THRSH) {
+            fft_result[i] = 0;
+        }
+        fft_result[i] *= FFT_GAIN;    
+    }
 }
 
 static void mic_sampler_task(void* params) {
@@ -132,7 +134,7 @@ static void mic_sampler_task(void* params) {
         assert(mic_codec_dev != NULL);
     }
 
-    ret = esp_codec_dev_set_in_gain(mic_codec_dev, 42.0);
+    ret = esp_codec_dev_set_in_gain(mic_codec_dev, SAMPLER_GAIN);
     if (ret != ESP_CODEC_DEV_OK) {
         ESP_LOGE(TAG, "Failed setting volume");
     }
@@ -146,6 +148,7 @@ static void mic_sampler_task(void* params) {
     ret = esp_codec_dev_open(mic_codec_dev, &fs);
     if (ret != ESP_CODEC_DEV_OK) {
         ESP_LOGE(TAG, "Failed opening the device");
+        ESP_ERROR_CHECK(ret);
     }
 
     int64_t last_time = esp_timer_get_time();
@@ -231,32 +234,35 @@ static void gsampler_processor_task(void* params) {
                 const int64_t recent_time = esp_timer_get_time();
                 real_duration = (int32_t)((recent_time - last_time) / 1000);
                 last_time = recent_time;
-                fft_process(receiver_buffer, RECEIVER_SAMPLES_COUNT, fft_complex_workspace);
-                const freq_ampl_t fft_max_freq = fft_get_max_freq(fft_complex_workspace, FFT_RESULT_SAMPLES_COUNT);
-                fft_fill_bins(fft_complex_workspace, fft_bins);
+                fft_process(receiver_buffer, fft_complex_workspace, fft_result);
+                const freq_ampl_t fft_max_freq = fft_get_max_freq(fft_result);
+                fft_fill_bins(fft_result, fft_bins);
 
                 ESP_LOGV(TAG, "Got %u samples, recev_buff=%d..%d, dur=%ld/%ldms, fft=[%.2f, %.2f, %.2f, %.2f], max=%.2fHz/%.2f.", 
                     receiver_buffer_idx,
                     receiver_buffer[0], receiver_buffer[receiver_buffer_idx - 1],
                     RECEIVER_SAMPLING_DURATION_MS, real_duration,
-                    fft_complex_workspace[0], fft_complex_workspace[1], fft_complex_workspace[2], fft_complex_workspace[3],
+                    fft_result[0], fft_result[1], fft_result[2], fft_result[3],
                     fft_max_freq.freq, fft_max_freq.ampl
                 );
 
-                result_processor(fft_complex_workspace, fft_bins);
-                if(++some_couner > 20) {
+                result_processor(fft_result, fft_bins);
+                if(++some_couner > 50) {
                     some_couner = 0;
 
                     // fft_printf(fft_bins);
 
+    
+                    // dsps_view(fft_complex_workspace, RECEIVER_SAMPLES_COUNT / 2, 64, 10,  -60, 40, '|');
+
                     // printf("samples = [");
-                    // for(int i=0; i<2048; ++i) {
-                    //     printf("%d%s", receiver_buffer[i], i < (2048 - 1) ? ", " : "]\n");
+                    // for(int i=0; i<RECEIVER_SAMPLES_COUNT; ++i) {
+                    //     printf("%d%s", receiver_buffer[i], i < (RECEIVER_SAMPLES_COUNT - 1) ? ", " : "]\n");
                     // }
 
                     // printf("fft_res = [");
                     // for(int i=0; i<FFT_RESULT_SAMPLES_COUNT; ++i) {
-                    //     printf("%.2f%s", fft_complex_workspace[i], i < (FFT_RESULT_SAMPLES_COUNT - 1) ? ", " : "]\n");
+                    //     printf("%.3f%s", fft_result[i], i < (FFT_RESULT_SAMPLES_COUNT - 1) ? ", " : "]\n");
                     // }
                 }
 

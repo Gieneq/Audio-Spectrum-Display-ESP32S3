@@ -39,6 +39,10 @@
         "model.h": "c",
         "string.h": "c",
         "algorithm": "c",
-        "led_matrix.h": "c"
+        "led_matrix.h": "c",
+        "array": "c",
+        "string": "c",
+        "string_view": "c",
+        "esp_err.h": "c"
     }
 }
