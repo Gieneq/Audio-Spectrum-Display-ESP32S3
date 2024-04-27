@@ -17,6 +17,9 @@
 #include "gdisplay.h"
 #include "model.h"
 
+#include "iot_button.h"
+#include "bsp/esp-bsp.h"
+
 static const char TAG[] = "Main";
 
 static led_matrix_t led_matrix;
@@ -135,6 +138,85 @@ static void process_results_draw_effect(
     }
 }
 
+static adc_oneshot_unit_handle_t bsp_adc_handle = NULL;
+
+static button_handle_t side_button;
+
+#define BUTTONS_COUNT       (3)
+static button_handle_t front_buttons[BUTTONS_COUNT];
+
+#define ADC_BUTTON_LEFT     (0)
+#define ADC_BUTTON_MID      (1)
+#define ADC_BUTTON_RIGHT    (2)
+
+static button_handle_t* left_btn;
+static button_handle_t* middle_btn;
+static button_handle_t* right_btn;
+
+static void button_side_released_callback(void *arg, void *data) {
+    (void)arg;
+    (void)data;
+    ESP_LOGI(TAG, "Side button released");
+}
+
+static void button_side_longpressed_callback(void *arg, void *data) {
+    (void)arg;
+    (void)data;
+    ESP_LOGI(TAG, "Side button longpressed");
+}
+
+static void button_left_released_callback(void *arg, void *data) {
+    (void)arg;
+    (void)data;
+    ESP_LOGI(TAG, "Left button released");
+}
+
+static void button_middle_released_callback(void *arg, void *data) {
+    (void)arg;
+    (void)data;
+    ESP_LOGI(TAG, "Middle button released");
+}
+
+static void button_right_released_callback(void *arg, void *data) {
+    (void)arg;
+    (void)data;
+    ESP_LOGI(TAG, "Right button released");
+}
+
+
+static const button_config_t adc_button_config[BUTTONS_COUNT] = {
+    {
+        .type = BUTTON_TYPE_ADC,
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+        .adc_button_config.adc_handle = &bsp_adc_handle,
+#endif
+        .adc_button_config.adc_channel = ADC_CHANNEL_0, // ADC1 channel 0 is GPIO1
+        .adc_button_config.button_index = ADC_BUTTON_LEFT,
+        .adc_button_config.min = 2310, // middle is 2410mV
+        .adc_button_config.max = 2510
+    },
+    {
+        .type = BUTTON_TYPE_ADC,
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+        .adc_button_config.adc_handle = &bsp_adc_handle,
+#endif
+        .adc_button_config.adc_channel = ADC_CHANNEL_0, // ADC1 channel 0 is GPIO1
+        .adc_button_config.button_index = ADC_BUTTON_MID,
+        .adc_button_config.min = 1880, // middle is 1980mV
+        .adc_button_config.max = 2080
+    },
+    {
+        .type = BUTTON_TYPE_ADC,
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+        .adc_button_config.adc_handle = &bsp_adc_handle,
+#endif
+        .adc_button_config.adc_channel = ADC_CHANNEL_0, // ADC1 channel 0 is GPIO1
+        .adc_button_config.button_index = ADC_BUTTON_RIGHT,
+        .adc_button_config.min = 720, // middle is 820mV
+        .adc_button_config.max = 920
+    },
+};
+
 void app_main(void) {
     info_prints();
     ESP_LOGI(TAG, "Starting!");
@@ -150,6 +232,41 @@ void app_main(void) {
     ret = gdisplay_lcd_init();
     ESP_ERROR_CHECK(ret);
 
+    /* Side button */
+    ret = bsp_iot_button_create(&side_button, NULL, 1);
+    ESP_ERROR_CHECK(ret);
+    
+    ret = iot_button_register_cb(side_button, BUTTON_PRESS_UP, button_side_released_callback, NULL);
+    ESP_ERROR_CHECK(ret);
+    
+    ret = iot_button_register_cb(side_button, BUTTON_LONG_PRESS_START, button_side_longpressed_callback, NULL);
+    ESP_ERROR_CHECK(ret);
+
+    ESP_ERROR_CHECK(bsp_adc_initialize());
+    bsp_adc_handle = bsp_adc_get_handle();
+    assert(bsp_adc_handle);
+
+    /* Front buttons */
+
+    /* Left button */
+    front_buttons[ADC_BUTTON_LEFT] = iot_button_create(&adc_button_config[ADC_BUTTON_LEFT]);
+    assert(front_buttons[ADC_BUTTON_LEFT]);
+    ret = iot_button_register_cb(front_buttons[ADC_BUTTON_LEFT], BUTTON_PRESS_UP, button_left_released_callback, NULL);
+    ESP_ERROR_CHECK(ret);
+    
+    /* MIddle button */
+    front_buttons[ADC_BUTTON_MID] = iot_button_create(&adc_button_config[ADC_BUTTON_MID]);
+    assert(front_buttons[ADC_BUTTON_MID]);
+    ret = iot_button_register_cb(front_buttons[ADC_BUTTON_MID], BUTTON_PRESS_UP, button_middle_released_callback, NULL);
+    ESP_ERROR_CHECK(ret);
+
+    /* Right button */
+    front_buttons[ADC_BUTTON_RIGHT] = iot_button_create(&adc_button_config[ADC_BUTTON_RIGHT]);
+    assert(front_buttons[ADC_BUTTON_RIGHT]);
+    ret = iot_button_register_cb(front_buttons[ADC_BUTTON_RIGHT], BUTTON_PRESS_UP, button_right_released_callback, NULL);
+    ESP_ERROR_CHECK(ret);
+
+   
     while(1) {
         vTaskDelay(1000);
     }
