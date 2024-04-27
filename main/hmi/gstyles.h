@@ -11,13 +11,16 @@ extern "C" {
 #define VIS_ROWS_COUNT      19
 
 #define VIS_BLOCK_WIDTH     11
-#define VIS_BLOCK_HEIGHT    5
+#define VIS_BLOCK_HEIGHT    4
 
 #define VIS_BAR_HGAP        2
 #define VIS_BAR_VGAP        2
 
 #define VIS_DISPLAY_WIDTH   (VIS_BAR_HGAP + VIS_BARS_COUNT * (VIS_BLOCK_WIDTH  + VIS_BAR_HGAP))
 #define VIS_DISPLAY_HEIGHT  (VIS_BAR_VGAP + VIS_ROWS_COUNT * (VIS_BLOCK_HEIGHT + VIS_BAR_VGAP))
+
+#define VIS_DISPLAY_BASE_WIDTH  (VIS_DISPLAY_WIDTH + 2 * 14)
+#define VIS_DISPLAY_BASE_HEIGHT (VIS_BLOCK_HEIGHT * 3)
 
 #if (VIS_DISPLAY_WIDTH > DISPL_TOTAL_WIDTH)
 #error "asdads"
@@ -27,10 +30,16 @@ extern "C" {
 #error "asdads"
 #endif
 
-#define PANE_BOTTOM_HEIGHT      40
+#define PANE_BOTTOM_HEIGHT      60
 
-#define VIS_X      ((DISPL_TOTAL_WIDTH - VIS_DISPLAY_WIDTH)/2)
-#define VIS_Y      (PANE_BOTTOM_HEIGHT)
+#define VIS_BASE_V_OFFSET            6
+#define VIS_V_OFFSET                 4
+
+#define VIS_BASE_X ((DISPL_TOTAL_WIDTH - VIS_DISPLAY_BASE_WIDTH) / 2)
+#define VIS_BASE_Y (VIS_BASE_V_OFFSET + PANE_BOTTOM_HEIGHT)
+
+#define VIS_X      ((DISPL_TOTAL_WIDTH - VIS_DISPLAY_WIDTH) / 2)
+#define VIS_Y      (VIS_BASE_Y + VIS_DISPLAY_BASE_HEIGHT + VIS_V_OFFSET)
 
 #define GREV(_val16) ((uint16_t)((_val16>>8) | (_val16<<8)))
 
@@ -53,11 +62,18 @@ extern "C" {
 #define LIGHTBLUE   0X7D7C
 #define GRAYBLUE    0X5458
 
+#define RAWCOLOR_BG                0x0000
+#define RAWCOLOR_DISPL_BACK        0x1082
+#define RAWCOLOR_DISPL_ACRYLIC     0x8C71
+#define RAWCOLOR_BOT_PANE_BG       0x2945
 
-#define VIS_PANE_BOTTOM_BG_COLOR    MAGENTA
-#define VIS_DISPLAY_BG_COLOR    GREV(GRAY)
-#define VIS_BLOCK_OFF_COLOR     (0xFFFF-0x001F)
-#define VIS_BLOCK_ON_COLOR      GREV(DARKBLUE)
+#define VIS_PANE_BOTTOM_BG_COLOR    (0xFFFF - (GREV(RAWCOLOR_BOT_PANE_BG)))
+
+#define VIS_DISPLAY_BG_COLOR        (0xFFFF - (GREV(RAWCOLOR_DISPL_BACK)))
+#define VIS_DISPLAY_BASE_COLOR        (0xFFFF - (GREV(RAWCOLOR_DISPL_ACRYLIC)))
+
+#define VIS_BLOCK_OFF_COLOR         (0xFFFF - (GREV(RED)))
+#define VIS_BLOCK_ON_COLOR          (0xFFFF - (GREV(RAWCOLOR_DISPL_ACRYLIC)))
 
 #ifdef __cplusplus
 }

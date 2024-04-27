@@ -81,10 +81,15 @@ void model_draw(gdisplay_api_t* gd_api) {
     if (model_interface_access(&model_if, portMAX_DELAY)) {
         (void)model_if; //not needed, only lock recsources
 
+        /* Bottom panel */
         gd_api->draw_rect(0, 0, DISPL_TOTAL_WIDTH, PANE_BOTTOM_HEIGHT, VIS_PANE_BOTTOM_BG_COLOR);
         
+        /* Display background: base + grid box */
+        gd_api->draw_rect(VIS_BASE_X, VIS_BASE_Y, VIS_DISPLAY_BASE_WIDTH, VIS_DISPLAY_BASE_HEIGHT, VIS_DISPLAY_BASE_COLOR);
+        gd_api->draw_rect(VIS_X, VIS_Y - VIS_V_OFFSET, VIS_DISPLAY_WIDTH, VIS_V_OFFSET, VIS_DISPLAY_BG_COLOR);
         gd_api->draw_rect(VIS_X, VIS_Y, VIS_DISPLAY_WIDTH, VIS_DISPLAY_HEIGHT, VIS_DISPLAY_BG_COLOR);
 
+        /* Display blocks */
         assert(LED_MATRIX_COLUMNS == VIS_BARS_COUNT);
         assert(LED_MATRIX_ROWS == VIS_ROWS_COUNT);
 
@@ -96,7 +101,7 @@ void model_draw(gdisplay_api_t* gd_api) {
                     VIS_Y + VIS_BAR_VGAP + row_idx * (VIS_BLOCK_HEIGHT + VIS_BAR_VGAP), 
                     VIS_BLOCK_WIDTH, 
                     VIS_BLOCK_HEIGHT, 
-                    bar_colored ? VIS_BLOCK_ON_COLOR : VIS_BLOCK_OFF_COLOR
+                    bar_colored == true ? VIS_BLOCK_ON_COLOR : VIS_BLOCK_OFF_COLOR
                 );
             }
         }
