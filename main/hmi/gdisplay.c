@@ -86,7 +86,6 @@ static void gdisplay_draw_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, u
     }
 }
 
-
 static void gdisplay_draw_bytes_bitmap(uint16_t x, uint16_t y, uint16_t w, const uint8_t* bytes, const uint16_t bytes_count) {
     assert(bytes);
     const uint16_t pixels_count = bytes_count / 2;
@@ -114,7 +113,7 @@ static void gdisplay_draw_bytes_bitmap(uint16_t x, uint16_t y, uint16_t w, const
         //     pixel_idx, ix, iy, b1, b2, color
         // );
 
-        gdisplay_draw_pixel(x + ix, y + iy, color);
+        gdisplay_draw_pixel(x + ix, y + (h - iy - 1), color);
     }
     // ESP_LOGI(TAG, "\n\n");
     

@@ -12,10 +12,22 @@ extern "C" {
 #define BTN_LEFT_BYTES_COUNT (BTN_LEFT_WIDTH * BTN_LEFT_HEIGHT * 2)
 extern const uint8_t btn_left_graphics_bytes[BTN_LEFT_BYTES_COUNT];
 
+#define BTN_LEFT_PRESSED_WIDTH  (60)
+#define BTN_LEFT_PRESSED_HEIGHT  (54)
+#define BTN_LEFT_PRESSED_BYTES_COUNT (BTN_LEFT_PRESSED_WIDTH * BTN_LEFT_PRESSED_HEIGHT * 2)
+extern const uint8_t btn_left_pressed_graphics_bytes[BTN_LEFT_PRESSED_BYTES_COUNT];
+
+
 #define BTN_RIGHT_WIDTH  (60)
 #define BTN_RIGHT_HEIGHT  (54)
 #define BTN_RIGHT_BYTES_COUNT (BTN_RIGHT_WIDTH * BTN_RIGHT_HEIGHT * 2)
 extern const uint8_t btn_right_graphics_bytes[BTN_RIGHT_BYTES_COUNT];
+
+#define BTN_RIGHT_PRESSED_WIDTH  (60)
+#define BTN_RIGHT_PRESSED_HEIGHT  (54)
+#define BTN_RIGHT_PRESSED_BYTES_COUNT (BTN_RIGHT_PRESSED_WIDTH * BTN_RIGHT_PRESSED_HEIGHT * 2)
+extern const uint8_t btn_right_pressed_graphics_bytes[BTN_RIGHT_PRESSED_BYTES_COUNT];
+
 
 #define BTN_MINUS_WIDTH  (60)
 #define BTN_MINUS_HEIGHT  (54)
@@ -37,7 +49,7 @@ extern const uint8_t label_effect_graphics_bytes[LABEL_EFFECT_BYTES_COUNT];
 #define LABEL_SOURCE_WIDTH  (184)
 #define LABEL_SOURCE_HEIGHT  (28)
 #define LABEL_SOURCE_BYTES_COUNT (LABEL_SOURCE_WIDTH * LABEL_SOURCE_HEIGHT * 2)
-extern const uint8_t label_source_graphics_bytes[LABEL_SOURCE_BYTES_COUNT]
+extern const uint8_t label_source_graphics_bytes[LABEL_SOURCE_BYTES_COUNT];
 
 #define LABEL_GAIN_WIDTH  (184)
 #define LABEL_GAIN_HEIGHT  (28)

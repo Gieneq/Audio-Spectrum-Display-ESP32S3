@@ -149,10 +149,6 @@ static button_handle_t front_buttons[BUTTONS_COUNT];
 #define ADC_BUTTON_MID      (1)
 #define ADC_BUTTON_RIGHT    (2)
 
-static button_handle_t* left_btn;
-static button_handle_t* middle_btn;
-static button_handle_t* right_btn;
-
 static void button_side_released_callback(void *arg, void *data) {
     (void)arg;
     (void)data;
@@ -165,22 +161,59 @@ static void button_side_longpressed_callback(void *arg, void *data) {
     ESP_LOGI(TAG, "Side button longpressed");
 }
 
+static void button_left_pressed_callback(void *arg, void *data) {
+    (void)arg;
+    (void)data;
+    ESP_LOGI(TAG, "Left button pressed");
+    model_interface_t* model_if = NULL;
+    if (model_interface_access(&model_if, portMAX_DELAY)) {
+        model_if->set_left_button_clicked(true);
+        model_interface_release();
+    }
+}
+
 static void button_left_released_callback(void *arg, void *data) {
     (void)arg;
     (void)data;
     ESP_LOGI(TAG, "Left button released");
+    model_interface_t* model_if = NULL;
+    if (model_interface_access(&model_if, portMAX_DELAY)) {
+        model_if->set_left_button_clicked(false);
+        model_interface_release();
+    }
 }
 
 static void button_middle_released_callback(void *arg, void *data) {
     (void)arg;
     (void)data;
     ESP_LOGI(TAG, "Middle button released");
+    model_interface_t* model_if = NULL;
+    if (model_interface_access(&model_if, portMAX_DELAY)) {
+        model_if->set_middle_button_clicked(true);
+        model_interface_release();
+    }
+}
+
+static void button_right_pressed_callback(void *arg, void *data) {
+    (void)arg;
+    (void)data;
+    ESP_LOGI(TAG, "Right button pressed");
+    model_interface_t* model_if = NULL;
+    if (model_interface_access(&model_if, portMAX_DELAY)) {
+        model_if->set_right_button_clicked(true);
+        model_interface_release();
+    }
 }
 
 static void button_right_released_callback(void *arg, void *data) {
     (void)arg;
     (void)data;
     ESP_LOGI(TAG, "Right button released");
+    model_interface_t* model_if = NULL;
+    if (model_interface_access(&model_if, portMAX_DELAY)) {
+        model_if->set_right_button_clicked(false);
+        model_interface_release();
+    }
 }
 
 
@@ -251,6 +284,8 @@ void app_main(void) {
     /* Left button */
     front_buttons[ADC_BUTTON_LEFT] = iot_button_create(&adc_button_config[ADC_BUTTON_LEFT]);
     assert(front_buttons[ADC_BUTTON_LEFT]);
+    ret = iot_button_register_cb(front_buttons[ADC_BUTTON_LEFT], BUTTON_PRESS_DOWN, button_left_pressed_callback, NULL);
+    ESP_ERROR_CHECK(ret);
     ret = iot_button_register_cb(front_buttons[ADC_BUTTON_LEFT], BUTTON_PRESS_UP, button_left_released_callback, NULL);
     ESP_ERROR_CHECK(ret);
     
@@ -263,6 +298,8 @@ void app_main(void) {
     /* Right button */
     front_buttons[ADC_BUTTON_RIGHT] = iot_button_create(&adc_button_config[ADC_BUTTON_RIGHT]);
     assert(front_buttons[ADC_BUTTON_RIGHT]);
+    ret = iot_button_register_cb(front_buttons[ADC_BUTTON_RIGHT], BUTTON_PRESS_DOWN, button_right_pressed_callback, NULL);
+    ESP_ERROR_CHECK(ret);
     ret = iot_button_register_cb(front_buttons[ADC_BUTTON_RIGHT], BUTTON_PRESS_UP, button_right_released_callback, NULL);
     ESP_ERROR_CHECK(ret);
 

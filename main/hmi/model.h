@@ -14,6 +14,9 @@ extern "C" {
 
 typedef struct model_interface_t {
     void (*set_led_matrix_values)(const led_matrix_t* led_mx);
+    void (*set_left_button_clicked)(bool clicked);
+    void (*set_middle_button_clicked)(bool clicked);
+    void (*set_right_button_clicked)(bool clicked);
 } model_interface_t;
 
 bool model_interface_access(model_interface_t** model_if, TickType_t timeout_tick_time);
