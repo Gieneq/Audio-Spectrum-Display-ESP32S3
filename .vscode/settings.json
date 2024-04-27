@@ -43,6 +43,7 @@
         "array": "c",
         "string": "c",
         "string_view": "c",
-        "esp_err.h": "c"
+        "esp_err.h": "c",
+        "gtypes.h": "c"
     }
 }

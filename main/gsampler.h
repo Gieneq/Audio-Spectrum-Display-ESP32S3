@@ -4,6 +4,7 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
 #include "esp_err.h"
 
 /* 
@@ -36,7 +37,17 @@ extern "C" {
 
 #define FFT_PRINTF_HEIGHT       (16)
 
-typedef void(*results_processor_t)(float result[FFT_RESULT_SAMPLES_COUNT], float bins[FFT_BINS_COUNT]);
+typedef void(*results_processor_t)(
+    float delta_time,
+    float result[FFT_RESULT_SAMPLES_COUNT],  
+    float result_grad[FFT_RESULT_SAMPLES_COUNT], 
+    float sum_result,
+    float sum_grad,
+    float bins[FFT_BINS_COUNT],
+    float bins_grad[FFT_BINS_COUNT],
+    float beat_positive_grad,
+    bool beat
+);
 
 esp_err_t gsampler_inti(results_processor_t result_proc);
 

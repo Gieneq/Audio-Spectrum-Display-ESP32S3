@@ -23,9 +23,33 @@ results_processor_t result_processor;
 __attribute__((aligned(16))) float window_time_domain[RECEIVER_SAMPLES_COUNT];
 __attribute__((aligned(16))) float testsig[RECEIVER_SAMPLES_COUNT];
 __attribute__((aligned(16))) float fft_complex_workspace[FFT_WORKSPACE_BUFFER_SIZE];
+
+float fft_result_deltatime_sec;
+
 __attribute__((aligned(16))) float fft_result[FFT_RESULT_SAMPLES_COUNT];
+__attribute__((aligned(16))) float fft_last_result[FFT_RESULT_SAMPLES_COUNT];
+__attribute__((aligned(16))) float fft_result_grad[FFT_RESULT_SAMPLES_COUNT];
 
 __attribute__((aligned(16))) float fft_bins[FFT_BINS_COUNT];
+__attribute__((aligned(16))) float fft_last_bins[FFT_BINS_COUNT];
+__attribute__((aligned(16))) float fft_bins_grad[FFT_BINS_COUNT];
+
+static float fft_sum;
+// static float fft_last_sum;
+static float fft_sum_grad;
+
+static bool fft_beat_detected;
+
+//val, grad, beat
+// 137.579483, 2677.354004, 1
+// 743.213013, 14084.505859, 0
+// 34.095547, -14471.784180, 0
+// 6.732538, -582.191345, 0
+// 5.041226, -37.584755, 0
+#define FFT_BEAT_SAMPLE_MAX (20)
+#define POSITIVE_GRAD_BEAT_THRSHOLD   (400.0F)
+#define FFT_DELAY_INTERVAL_US   ((100LLU) * 1000LLU)
+static int64_t fft_beat_detected_last_time_us;
 
 static const uint8_t bins_map[1024] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20};
 
@@ -209,8 +233,9 @@ static void gsampler_processor_task(void* params) {
     size_t remaining_halfwords_count = RECEIVER_SAMPLES_COUNT;
     size_t receiver_buffer_idx = 0;
 
-    int32_t real_duration = 0;
+    int32_t real_duration_ms = 0;
     int64_t last_time = esp_timer_get_time();
+    fft_beat_detected_last_time_us = last_time;
 
     int some_couner = 0;
 
@@ -232,7 +257,7 @@ static void gsampler_processor_task(void* params) {
                 /* Got enough */
 
                 const int64_t recent_time = esp_timer_get_time();
-                real_duration = (int32_t)((recent_time - last_time) / 1000);
+                real_duration_ms = (int32_t)((recent_time - last_time) / 1000);
                 last_time = recent_time;
                 fft_process(receiver_buffer, fft_complex_workspace, fft_result);
                 const freq_ampl_t fft_max_freq = fft_get_max_freq(fft_result);
@@ -241,12 +266,65 @@ static void gsampler_processor_task(void* params) {
                 ESP_LOGV(TAG, "Got %u samples, recev_buff=%d..%d, dur=%ld/%ldms, fft=[%.2f, %.2f, %.2f, %.2f], max=%.2fHz/%.2f.", 
                     receiver_buffer_idx,
                     receiver_buffer[0], receiver_buffer[receiver_buffer_idx - 1],
-                    RECEIVER_SAMPLING_DURATION_MS, real_duration,
+                    RECEIVER_SAMPLING_DURATION_MS, real_duration_ms,
                     fft_result[0], fft_result[1], fft_result[2], fft_result[3],
                     fft_max_freq.freq, fft_max_freq.ampl
                 );
 
-                result_processor(fft_result, fft_bins);
+                /* 
+                 * Evaluate results 
+                 */
+
+                /* Delta time */
+                fft_result_deltatime_sec = ((float)real_duration_ms) / 1000.0F;
+                fft_result_deltatime_sec = fft_result_deltatime_sec > 0.0F ? fft_result_deltatime_sec : 0.0001F;
+
+                /* Gradient fft results */
+                fft_sum = 0;
+                fft_sum_grad = 0;
+                for (size_t sample_idx = 0; sample_idx < FFT_RESULT_SAMPLES_COUNT; ++sample_idx) {
+                    fft_sum += fft_result[sample_idx];
+                    fft_result_grad[sample_idx] = (fft_result[sample_idx] - fft_last_result[sample_idx]) / fft_result_deltatime_sec;
+                    fft_sum_grad += fft_result_grad[sample_idx];
+                    fft_last_result[sample_idx] = fft_result[sample_idx];
+                }
+
+                /* Gradient fft bins */
+                for (size_t bin_idx = 0; bin_idx < FFT_BINS_COUNT; ++bin_idx) {
+                    fft_bins_grad[bin_idx] = (fft_bins[bin_idx] - fft_last_bins[bin_idx]) / fft_result_deltatime_sec;
+                    fft_last_bins[bin_idx] = fft_bins[bin_idx];
+                }
+
+                /* Bit detector */
+                fft_beat_detected = false;
+
+                float positive_grad_sum = 0;
+                for (size_t sample_idx = 0; (sample_idx < FFT_RESULT_SAMPLES_COUNT) && (sample_idx < FFT_BEAT_SAMPLE_MAX); ++sample_idx) {
+                    positive_grad_sum += fft_result_grad[sample_idx] > 0.0F ? fft_result_grad[sample_idx] : 0.0F;
+                }
+
+                // todo - add mean filtering automatix threshold calculation
+                if(positive_grad_sum > POSITIVE_GRAD_BEAT_THRSHOLD) {
+                    const int32_t beat_detector_delta_time_us = recent_time - fft_beat_detected_last_time_us;
+                    if(beat_detector_delta_time_us > FFT_DELAY_INTERVAL_US) {
+                        fft_beat_detected_last_time_us = recent_time;
+                        fft_beat_detected = true;
+                    }
+                }
+
+                /* Send results */
+                result_processor(
+                    fft_result_deltatime_sec,
+                    fft_result, 
+                    fft_result_grad,
+                    fft_sum,
+                    fft_sum_grad,
+                    fft_bins,
+                    fft_bins_grad,
+                    positive_grad_sum,
+                    fft_beat_detected
+                );
+
                 if(++some_couner > 50) {
                     some_couner = 0;
 
