@@ -73,6 +73,8 @@ static void gdisplay_task(void* params);
 /* Tools */
 
 static void gdisplay_draw_pixel(uint16_t x, uint16_t y, uint16_t color) {
+    assert(x < DISPLAY_WIDTH);
+    assert(y < DISPLAY_HEIGHT);
     display_buffer[x + DISPLAY_WIDTH * y] = color;
 }
 
@@ -84,6 +86,39 @@ static void gdisplay_draw_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, u
     }
 }
 
+
+static void gdisplay_draw_bytes_bitmap(uint16_t x, uint16_t y, uint16_t w, const uint8_t* bytes, const uint16_t bytes_count) {
+    assert(bytes);
+    const uint16_t pixels_count = bytes_count / 2;
+    const uint16_t h = pixels_count / w;
+    assert((w * h * 2) == bytes_count);
+
+    for (uint16_t pixel_idx = 0; pixel_idx < pixels_count; pixel_idx++) {
+
+        // //#define YELLOW      0xFFE0
+        // const uint8_t b2 = 0xFF;
+        // const uint8_t b1 = 0xE0;
+        // const uint16_t color = 0xFFFF - ((b1 << 8) | b2);
+
+        
+        const uint16_t b1 = (uint16_t)(bytes[pixel_idx * 2]);
+        const uint16_t b2 = (uint16_t)(bytes[pixel_idx * 2 + 1]);
+        // const uint16_t color = 0xFFFF - ((b1 << 8) | b2);
+        // const uint16_t color = (b2 << 8) | b1; //zielony
+        const uint16_t color = 0xFFFF - ((b1 << 8) | b2); //magenta
+
+        const uint16_t ix = pixel_idx % w;
+        const uint16_t iy = pixel_idx / w;
+        
+        // ESP_LOGI(TAG, "PX=%u (%u/%u), b1=0x%02X, b2=0x%02X, color=0x%04X.\n",
+        //     pixel_idx, ix, iy, b1, b2, color
+        // );
+
+        gdisplay_draw_pixel(x + ix, y + iy, color);
+    }
+    // ESP_LOGI(TAG, "\n\n");
+    
+}
 
 static void gdisplay_fill_black() {
     memset(display_buffer, 0, DISPLAY_PIXELS_COUNT * sizeof(uint16_t));
@@ -423,6 +458,7 @@ esp_err_t gdisplay_lcd_init(void) {
 
     gdisplay_api.draw_pixel = gdisplay_draw_pixel;
     gdisplay_api.draw_rect = gdisplay_draw_rect;
+    gdisplay_api.draw_bytes_bitmap = gdisplay_draw_bytes_bitmap;
     gdisplay_api.fill_black = gdisplay_fill_black;
     gdisplay_api.fill_color = gdisplay_fill_color;
     gdisplay_api.get_display_width = gdisplay_get_display_width;

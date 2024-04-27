@@ -30,7 +30,7 @@ extern "C" {
 #error "asdads"
 #endif
 
-#define PANE_BOTTOM_HEIGHT      60
+#define PANE_BOTTOM_HEIGHT      62
 
 #define VIS_BASE_V_OFFSET            6
 #define VIS_V_OFFSET                 4
