@@ -122,7 +122,7 @@ static void gdisplay_draw_text(uint16_t x, uint16_t y, const gfont_t* font, cons
                 }
             }
 
-            next_char_x += glyph_w + 4;
+            next_char_x += glyph_w;
         }
     }
 }

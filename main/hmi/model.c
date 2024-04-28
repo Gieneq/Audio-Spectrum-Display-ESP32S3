@@ -171,7 +171,7 @@ void model_draw(gdisplay_api_t* gd_api) {
             }
         }
 
-        gd_api->draw_text(30, 30, &font_rockwell_4pt, "??00????");
+        gd_api->draw_text(2, 50, &font_rockwell_4pt, "?0123456789ABCDEFGH+-+-4");
     
         model_interface_release();
     }
