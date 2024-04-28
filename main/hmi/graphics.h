@@ -56,6 +56,10 @@ extern const uint8_t label_source_graphics_bytes[LABEL_SOURCE_BYTES_COUNT];
 #define LABEL_GAIN_BYTES_COUNT (LABEL_GAIN_WIDTH * LABEL_GAIN_HEIGHT * 2)
 extern const uint8_t label_gain_graphics_bytes[LABEL_GAIN_BYTES_COUNT];
 
+#define FONT_ROCKWELL_4PT_WIDTH  (92)
+#define FONT_ROCKWELL_4PT_HEIGHT  (92)
+#define FONT_ROCKWELL_4PT_BYTES_COUNT (FONT_ROCKWELL_4PT_WIDTH * FONT_ROCKWELL_4PT_HEIGHT * 2)
+extern const uint8_t font_rockwell_4pt_graphics_bytes[FONT_ROCKWELL_4PT_BYTES_COUNT];
 
 #ifdef __cplusplus
 }

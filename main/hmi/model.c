@@ -11,6 +11,7 @@
 
 #include "gstyles.h"
 #include "graphics.h"
+#include "gfonts.h"
 
 static const char *TAG = "Model";
 
@@ -169,6 +170,8 @@ void model_draw(gdisplay_api_t* gd_api) {
                 );
             }
         }
+
+        gd_api->draw_text(30, 30, &font_rockwell_4pt, "??00????");
     
         model_interface_release();
     }

@@ -21,6 +21,7 @@
 #include "gstyles.h"
 #include "gdisplay_api.h"
 #include "model.h"
+#include "gfonts.h"
 
 static const char TAG[] = "GDisplay";
 
@@ -86,6 +87,46 @@ static void gdisplay_draw_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, u
     }
 }
 
+static void gdisplay_draw_text(uint16_t x, uint16_t y, const gfont_t* font, const char* text) {
+    const size_t chars_count = strlen(text);
+    if (chars_count == 0) {
+        return;
+    }
+
+    uint16_t next_char_x = 0;
+
+    for (size_t char_idx = 0; char_idx < chars_count; ++char_idx) {
+        const char ch = text[char_idx];
+        const gfont_glyph_t* glyph_data = gfont_get_glyph_with_char(font, ch);
+
+        if (glyph_data) {
+            const uint16_t bitmap_w =       font->font_graphics_width;
+            const uint8_t* bytes =          font->font_graphics_bytes;
+            const uint16_t glyph_w =        glyph_data->bitmap_coords.w;
+            const uint16_t glyph_h =        glyph_data->bitmap_coords.h;
+            const uint16_t glyph_x =        glyph_data->bitmap_coords.x;
+            const uint16_t glyph_y =        glyph_data->bitmap_coords.y;
+
+            for (uint16_t iy = 0; iy < glyph_h; ++iy) {
+                for (uint16_t ix = 0; ix < glyph_w; ++ix) {
+                    const uint16_t pixel_idx = 
+                        bitmap_w * (glyph_y + iy) + (glyph_x + ix);
+                    const uint16_t pixel_x = x + next_char_x + ix;
+                    const uint16_t pixel_y = y + (glyph_h - iy - 1);
+                    
+                    const uint16_t b1 = (uint16_t)(bytes[pixel_idx * 2]);
+                    const uint16_t b2 = (uint16_t)(bytes[pixel_idx * 2 + 1]);
+                    const uint16_t color = (b1 << 8) | b2; // image already negated
+                    
+                    gdisplay_draw_pixel(pixel_x, pixel_y, color);
+                }
+            }
+
+            next_char_x += glyph_w + 4;
+        }
+    }
+}
+
 static void gdisplay_draw_bytes_bitmap(uint16_t x, uint16_t y, uint16_t w, const uint8_t* bytes, const uint16_t bytes_count) {
     assert(bytes);
     const uint16_t pixels_count = bytes_count / 2;
@@ -102,8 +143,6 @@ static void gdisplay_draw_bytes_bitmap(uint16_t x, uint16_t y, uint16_t w, const
         
         const uint16_t b1 = (uint16_t)(bytes[pixel_idx * 2]);
         const uint16_t b2 = (uint16_t)(bytes[pixel_idx * 2 + 1]);
-        // const uint16_t color = 0xFFFF - ((b1 << 8) | b2);
-        // const uint16_t color = (b2 << 8) | b1; //zielony
         const uint16_t color = 0xFFFF - ((b1 << 8) | b2); //magenta
 
         const uint16_t ix = pixel_idx % w;
@@ -457,6 +496,7 @@ esp_err_t gdisplay_lcd_init(void) {
 
     gdisplay_api.draw_pixel = gdisplay_draw_pixel;
     gdisplay_api.draw_rect = gdisplay_draw_rect;
+    gdisplay_api.draw_text = gdisplay_draw_text;
     gdisplay_api.draw_bytes_bitmap = gdisplay_draw_bytes_bitmap;
     gdisplay_api.fill_black = gdisplay_fill_black;
     gdisplay_api.fill_color = gdisplay_fill_color;
