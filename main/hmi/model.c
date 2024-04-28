@@ -17,14 +17,6 @@ static const char *TAG = "Model";
 
 static SemaphoreHandle_t model_mutex;
 
-typedef enum option_select_t {
-    OPTION_SELECT_GAIN,
-    OPTION_SELECT_EFFECT,
-    OPTION_SELECT_SOURCE,
-
-    OPTION_SELECT_COUNT,
-} option_select_t;
-
 typedef struct model_t {
     model_interface_t interface;
     led_matrix_t led_matrix;
@@ -34,6 +26,10 @@ typedef struct model_t {
         bool right_clicked;
         // bool middle_clicked;
     } front_buttons;
+
+    struct {
+        float gain;
+    } options_values;
 
     option_select_t option_selected;
 } model_t;
@@ -54,13 +50,15 @@ static void model_set_right_button_clicked(bool clicked) {
     get_model()->front_buttons.right_clicked = clicked;
 }
 
+static void model_set_option_selected(option_select_t option) {
+    get_model()->option_selected = option;
+}
+
 static void model_set_middle_button_clicked(bool clicked) {
-    if(clicked) {
-        int next_option_index = get_model()->option_selected + 1;
-        next_option_index %= OPTION_SELECT_COUNT;
-        get_model()->option_selected = (option_select_t)next_option_index;
-        //todo - emit event or something
-    }
+}
+
+static void model_set_gain(float g) {
+    get_model()->options_values.gain = g;
 }
 
 static model_t* get_model() {
@@ -73,10 +71,13 @@ static model_t* get_model() {
         _model.interface.set_left_button_clicked = model_set_left_button_clicked;
         _model.interface.set_right_button_clicked = model_set_right_button_clicked;
         _model.interface.set_middle_button_clicked = model_set_middle_button_clicked;
+        _model.interface.set_option_selected = model_set_option_selected;
+        _model.interface.set_gain = model_set_gain;
 
         _model.front_buttons.left_clicked = false;
         _model.front_buttons.right_clicked = false;
-        // _model.front_buttons.middle_clicked = false;
+
+        _model.options_values.gain = 1.0F;
 
         _model.option_selected = OPTION_SELECT_GAIN;
 
@@ -124,9 +125,11 @@ void model_draw(gdisplay_api_t* gd_api) {
     model_interface_t* model_if = NULL;
     if (model_interface_access(&model_if, portMAX_DELAY)) {
         (void)model_if; //not needed, only lock recsources
+        char text_buff[32] = {0};
 
         /* Bottom panel */
         gd_api->draw_rect(0, 0, DISPL_TOTAL_WIDTH, PANE_BOTTOM_HEIGHT, VIS_PANE_BOTTOM_BG_COLOR);
+        gd_api->draw_rect(68, 39, 184, 16, VIS_PANE_BOTTOM_TEXT_BG_COLOR);
         
         if (get_model()->front_buttons.left_clicked) {
             gd_api->draw_bytes_bitmap(4, 4, BTN_LEFT_PRESSED_WIDTH, btn_left_pressed_graphics_bytes, BTN_LEFT_PRESSED_BYTES_COUNT);
@@ -141,11 +144,15 @@ void model_draw(gdisplay_api_t* gd_api) {
         }
 
         if (get_model()->option_selected == OPTION_SELECT_GAIN) {
-            gd_api->draw_bytes_bitmap(68, 4, LABEL_GAIN_WIDTH, label_gain_graphics_bytes, LABEL_GAIN_BYTES_COUNT);
+
+            snprintf(text_buff, sizeof(text_buff), "%.3f", get_model()->options_values.gain);
+            gd_api->draw_text(140, 41, &font_rockwell_4pt, text_buff);
+
+            gd_api->draw_bytes_bitmap(68, 6, LABEL_GAIN_WIDTH, label_gain_graphics_bytes, LABEL_GAIN_BYTES_COUNT);
         } else if (get_model()->option_selected == OPTION_SELECT_SOURCE) {
-            gd_api->draw_bytes_bitmap(68, 4, LABEL_SOURCE_WIDTH, label_source_graphics_bytes, LABEL_SOURCE_BYTES_COUNT);
+            gd_api->draw_bytes_bitmap(68, 6, LABEL_SOURCE_WIDTH, label_source_graphics_bytes, LABEL_SOURCE_BYTES_COUNT);
         } else if (get_model()->option_selected == OPTION_SELECT_EFFECT) {
-            gd_api->draw_bytes_bitmap(68, 4, LABEL_EFFECT_WIDTH, label_effect_graphics_bytes, LABEL_EFFECT_BYTES_COUNT);
+            gd_api->draw_bytes_bitmap(68, 6, LABEL_EFFECT_WIDTH, label_effect_graphics_bytes, LABEL_EFFECT_BYTES_COUNT);
         }
 
         
@@ -170,8 +177,6 @@ void model_draw(gdisplay_api_t* gd_api) {
                 );
             }
         }
-
-        gd_api->draw_text(2, 50, &font_rockwell_4pt, "?0123456789ABCDEFGH+-+-4");
     
         model_interface_release();
     }

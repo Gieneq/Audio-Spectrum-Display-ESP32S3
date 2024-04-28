@@ -19,6 +19,7 @@
 
 #include "iot_button.h"
 #include "bsp/esp-bsp.h"
+#include "gtypes.h"
 
 static const char TAG[] = "Main";
 
@@ -28,6 +29,9 @@ static float heights[LED_MATRIX_COLUMNS];
 static float velocities[LED_MATRIX_COLUMNS];
 
 const float gravity_acceleration = -60.0F;
+
+static float ampl_gain = 1.0F;
+static option_select_t recent_option_selected = OPTION_SELECT_GAIN;
 
 static void info_prints() {
     /* Print chip information */
@@ -179,6 +183,13 @@ static void button_left_released_callback(void *arg, void *data) {
     model_interface_t* model_if = NULL;
     if (model_interface_access(&model_if, portMAX_DELAY)) {
         model_if->set_left_button_clicked(false);
+
+        if (recent_option_selected == OPTION_SELECT_GAIN) {
+            ampl_gain *= 0.9F;
+            gsampler_set_gain(ampl_gain);
+            model_if->set_gain(ampl_gain);
+        }
+
         model_interface_release();
     }
 }
@@ -190,6 +201,12 @@ static void button_middle_released_callback(void *arg, void *data) {
     model_interface_t* model_if = NULL;
     if (model_interface_access(&model_if, portMAX_DELAY)) {
         model_if->set_middle_button_clicked(true);
+
+        int next_option_index = recent_option_selected + 1;
+        next_option_index %= OPTION_SELECT_COUNT;
+        recent_option_selected = next_option_index;
+        model_if->set_option_selected((option_select_t)next_option_index);
+
         model_interface_release();
     }
 }
@@ -212,6 +229,13 @@ static void button_right_released_callback(void *arg, void *data) {
     model_interface_t* model_if = NULL;
     if (model_interface_access(&model_if, portMAX_DELAY)) {
         model_if->set_right_button_clicked(false);
+
+        if (recent_option_selected == OPTION_SELECT_GAIN) {
+            ampl_gain *= 1.1F;
+            gsampler_set_gain(ampl_gain);
+            model_if->set_gain(ampl_gain);
+        }
+
         model_interface_release();
     }
 }

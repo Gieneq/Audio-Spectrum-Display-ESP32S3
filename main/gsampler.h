@@ -51,6 +51,8 @@ typedef void(*results_processor_t)(
 
 esp_err_t gsampler_inti(results_processor_t result_proc);
 
+void gsampler_set_gain(float g);
+
 #ifdef __cplusplus
 }
 #endif

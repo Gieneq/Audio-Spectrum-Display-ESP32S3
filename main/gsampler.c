@@ -19,6 +19,7 @@ static const char TAG[] = "Main";
 
 static RingbufHandle_t ringbuff_handle;
 results_processor_t result_processor;
+static float variable_gain = 1.0F;
 
 __attribute__((aligned(16))) float window_time_domain[RECEIVER_SAMPLES_COUNT];
 __attribute__((aligned(16))) float testsig[RECEIVER_SAMPLES_COUNT];
@@ -143,7 +144,7 @@ static void fft_process(int16_t samples[RECEIVER_SAMPLES_COUNT], float workspace
         if(fft_result[i] < FFT_THRSH) {
             fft_result[i] = 0;
         }
-        fft_result[i] *= FFT_GAIN;    
+        fft_result[i] *= (FFT_GAIN * variable_gain);    
     }
 }
 
@@ -388,4 +389,8 @@ esp_err_t gsampler_inti(results_processor_t result_proc) {
     ESP_RETURN_ON_FALSE(mic_sampler_task_was_created, ESP_FAIL, TAG, "Failed creating \'mic_sampler_task\'!");
 
     return ret;
+}
+
+void gsampler_set_gain(float g) {
+    variable_gain = g;
 }

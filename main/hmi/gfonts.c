@@ -82,6 +82,10 @@ static const gfont_glyph_t font_glyphs_rockwell_4pt[] = {
 
 //
     {
+        .sign = '.',
+        .bitmap_coords = {14, 66, (18 - 14) + 1, (77 - 66) + 1}
+    },
+    {
         .sign = '+',
         .bitmap_coords = {25, 66, (37 - 25) + 1, (77 - 66) + 1}
     },
