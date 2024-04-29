@@ -21,7 +21,10 @@
 
 #define LEDSTRIP_GPIO                   39
 
-#define LEDS_COUNT                      (21 * 19)
+#define LEDS_GRID_W                     (21)
+#define LEDS_GRID_H                     (19)
+
+#define LEDS_COUNT                      (LEDS_GRID_W * LEDS_GRID_H)
 #define COLORS_BITS                     (3 * 8)
 #define BIT_RESOLUTION                  (4)
 
@@ -103,13 +106,26 @@ static void ws2812b_grid_fill_color(uint8_t r, uint8_t g, uint8_t b) {
     }
 }
 
+static void ws2812b_draw_pixel_in_zigzak(uint16_t x, uint16_t y, uint8_t r, uint8_t g, uint8_t b) {
+    const bool reversed_column = (x % 2) != 0;
+    if (reversed_column) {
+        y = LEDS_GRID_H - y - 1;
+    }
+
+    const uint16_t pixel_idx = y + x * LEDS_GRID_H;
+    /* Set pixel in LED strip b*/
+    ws2812b_grid_set_pixel(pixel_idx, r, g, b);
+}
+
 static void ws2812b_draw_matrix_in_zigzak(const led_matrix_t* led_matrix) {
-    const uint8_t column_0_height = led_matrix->columns_heights[0] / 2;
-    for (size_t pixel_idx = 0; pixel_idx < 7; ++pixel_idx) {
-        if(pixel_idx < column_0_height) {
-            ws2812b_grid_set_pixel(pixel_idx, 64, 0, 0);
-        } else {
-            ws2812b_grid_set_pixel(pixel_idx, 0, 0, 0);
+    for (size_t ix = 0; ix < LEDS_GRID_W; ++ix) {
+        const uint8_t column_height = led_matrix->columns_heights[ix];
+        for (size_t iy = 0; iy < LEDS_GRID_H; ++iy) {
+            if(iy < column_height) {
+                ws2812b_draw_pixel_in_zigzak(ix, iy, 64, 0, 0);
+            } else {
+                ws2812b_draw_pixel_in_zigzak(ix, iy, 0, 0, 0);
+            }
         }
     }
 }
