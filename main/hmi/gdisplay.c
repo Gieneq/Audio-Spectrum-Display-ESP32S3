@@ -51,7 +51,9 @@ static const char TAG[] = "GDisplay";
 #define LCD_BK_LIGHT_ON_LEVEL   0
 
 static spi_device_handle_t spi;
-static uint16_t* display_buffer;
+
+// static uint16_t* display_buffer;
+DMA_ATTR static uint16_t display_buffer[DISPLAY_PIXELS_COUNT];
 
 static gdisplay_api_t gdisplay_api;
 
@@ -491,8 +493,10 @@ static void gdisplay_task(void* params) {
 esp_err_t gdisplay_lcd_init(void) {
     ESP_LOGI(TAG, "GDisplay initializing...");
 
-    display_buffer = heap_caps_malloc(DISPLAY_PIXELS_COUNT * sizeof(uint16_t), MALLOC_CAP_DMA);
-    assert(display_buffer);
+    ESP_LOGI(TAG, "Attempt to allocate DMA MEM %u B... Available=%u B.", 
+        DISPLAY_PIXELS_COUNT * sizeof(uint16_t), heap_caps_get_free_size(MALLOC_CAP_DMA));
+    // display_buffer = heap_caps_malloc(DISPLAY_PIXELS_COUNT * sizeof(uint16_t), MALLOC_CAP_DMA);
+    // assert(display_buffer);
 
     gdisplay_api.draw_pixel = gdisplay_draw_pixel;
     gdisplay_api.draw_rect = gdisplay_draw_rect;

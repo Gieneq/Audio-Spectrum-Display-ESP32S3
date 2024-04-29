@@ -46,6 +46,17 @@
         "esp_err.h": "c",
         "gtypes.h": "c",
         "graphics.h": "c",
-        "stdint.h": "c"
+        "stdint.h": "c",
+        "ws2812b_grid.h": "c",
+        "led_strip.h": "c",
+        "ringbuf.h": "c",
+        "esp_timer.h": "c",
+        "esp_log.h": "c",
+        "stdbool.h": "c",
+        "assert.h": "c",
+        "heap_private.h": "c",
+        "esp_system.h": "c",
+        "multi_heap.h": "c",
+        "esp_heap_caps.h": "c"
     }
 }

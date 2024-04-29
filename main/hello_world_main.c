@@ -12,6 +12,7 @@
 #include "esp_chip_info.h"
 #include "esp_flash.h"
 #include "esp_log.h"
+#include "esp_heap_caps.h"
 
 #include "gsampler.h"
 #include "gdisplay.h"
@@ -20,6 +21,7 @@
 #include "iot_button.h"
 #include "bsp/esp-bsp.h"
 #include "gtypes.h"
+#include "leds/ws2812b_grid.h"
 
 static const char TAG[] = "Main";
 
@@ -289,6 +291,9 @@ void app_main(void) {
     ret = gdisplay_lcd_init();
     ESP_ERROR_CHECK(ret);
 
+    ret = ws2812b_grid_init();
+    ESP_ERROR_CHECK(ret);
+
     /* Side button */
     ret = bsp_iot_button_create(&side_button, NULL, 1);
     ESP_ERROR_CHECK(ret);
@@ -327,8 +332,11 @@ void app_main(void) {
     ret = iot_button_register_cb(front_buttons[ADC_BUTTON_RIGHT], BUTTON_PRESS_UP, button_right_released_callback, NULL);
     ESP_ERROR_CHECK(ret);
 
+    ESP_LOGI(TAG, "Free DMA space %u B", heap_caps_get_free_size(MALLOC_CAP_DMA));
+    ESP_LOGI(TAG, "Free SPIRAM space %u B", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    ESP_LOGI(TAG, "Free Internal space %u B", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
    
     while(1) {
-        vTaskDelay(1000);
+        vTaskDelay(500);
     }
 }

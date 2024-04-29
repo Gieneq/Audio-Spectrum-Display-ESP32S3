@@ -3,6 +3,7 @@ dependencies:
   idf: ">=5.0"
   
   espressif/esp-dsp: "^1.2.1"
+  espressif/led_strip: "^2.5.3"
   
   espressif/esp-box-lite:
     version: "2.*"
