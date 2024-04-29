@@ -21,31 +21,37 @@
 
 #define LEDSTRIP_GPIO                   39
 
-#define LEDS_COUNT                      (3)
+#define LEDS_COUNT                      (21 * 19)
 #define COLORS_BITS                     (3 * 8)
-#define BIT_RESOLUTION                  (8)
+#define BIT_RESOLUTION                  (4)
 
 #if BIT_RESOLUTION == 8
 #define CODE_BIT_LOW                    (0xC0)
 #define CODE_BIT_HIGH                   (0xFC)
 #else
-#error "Not implemented"
+#define CODE_BIT_LOW                    (0x08)
+#define CODE_BIT_HIGH                   (0x0E)
 #endif
 
-#define RESET_PHASE_SIZE                (50 * BIT_RESOLUTION / 8)
+#define RESET_PHASE_SIZE                (52 * BIT_RESOLUTION / 8)
 #define LEDSTRIP_REQUIRED_BUFFER_SIZE   ((LEDS_COUNT * COLORS_BITS * BIT_RESOLUTION) + RESET_PHASE_SIZE)
-#define TRANSACTIONS_COUNT              (1)
+#define TRANSACTIONS_COUNT              (2)
 #define TRANSACTION_BUFFER_SIZE         (LEDSTRIP_REQUIRED_BUFFER_SIZE / TRANSACTIONS_COUNT)
 
 #if ((TRANSACTION_BUFFER_SIZE * TRANSACTIONS_COUNT) != LEDSTRIP_REQUIRED_BUFFER_SIZE)
 #error "LEDSTRIP_REQUIRED_BUFFER_SIZE not equali divided :("
 #endif
 
-#define SPI_CLK_FREQ                    (6 * 1000 * 1000 + 400 * 1000)
+#define SPI_CLK_FREQ                    ((6 * 1000 * 1000 + 400 * 1000) * BIT_RESOLUTION / 8)
 
 #define LEDS_HOST                       SPI3_HOST
 
+#define LEDSTRIP_TARGET_DRAW_INTERVAL  (40)
+
 static led_matrix_t led_matrix;
+
+ws2812b_grid_interface_t ws2812b_grid_interface;
+static SemaphoreHandle_t ws2812b_grid_interface_mutex;
 
 // static uint8_t* transfer_buffer;
 DMA_ATTR static uint8_t transfer_buffer[LEDSTRIP_REQUIRED_BUFFER_SIZE];
@@ -63,26 +69,32 @@ static void ws2812b_grid_set_byte(uint16_t byte_index, uint8_t value) {
             (value & (1<<bit_idx)) > 0 ? CODE_BIT_HIGH : CODE_BIT_LOW;
     }
 #else
-#error "Not implemented"
+    /* 1B takes 4B of transfer */
+    for (uint8_t bit_idx = 0; bit_idx < 8; ++bit_idx) {
+        const uint8_t inv_bit_idx = 8 - bit_idx - 1;
+        const uint8_t code_value = (value & (1<<inv_bit_idx)) > 0 ? CODE_BIT_HIGH : CODE_BIT_LOW;
+        
+        const uint16_t selected_byte_idx = bit_idx / 2;
+
+        if(bit_idx % 2 == 0) {
+            transfer_buffer[byte_index * 4 + selected_byte_idx] = (code_value<<4) & 0xF0;
+        }
+        else {
+            transfer_buffer[byte_index * 4 + selected_byte_idx] |= code_value & 0x0F;
+        }
+    }
 #endif
 }
 
 static void ws2812b_grid_set_pixel(uint16_t pixel_idx, uint8_t r, uint8_t g, uint8_t b) {
-#if BIT_RESOLUTION == 8
-    /* Each pixel is stored in 24B */
-
     /* Green */
-    ws2812b_grid_set_byte(pixel_idx * 3 + 0, g);
+    ws2812b_grid_set_byte(pixel_idx * 3 + 0, g);//0x80
     
     /* Red */
     ws2812b_grid_set_byte(pixel_idx * 3 + 1, r);
     
     /* Blue */
-    ws2812b_grid_set_byte(pixel_idx * 3 + 2, b);
-
-#else
-#error "Not implemented"
-#endif
+    ws2812b_grid_set_byte(pixel_idx * 3 + 2, b);//0x01
 }
 
 static void ws2812b_grid_fill_color(uint8_t r, uint8_t g, uint8_t b) {
@@ -106,12 +118,43 @@ static void ws2812b_grid_refresh() {
     }
 }
 
+static void ws2812b_grid_task(void* params) {
+    
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    const TickType_t target_interval_refresh_ticks = (LEDSTRIP_TARGET_DRAW_INTERVAL) / 10;
+
+    uint8_t color = 0;
+
+    while(1) {
+        ws2812b_grid_interface_t* grid_if = NULL;
+        if (ws2812b_grid_access(&grid_if, portMAX_DELAY)) {
+            (void)grid_if; //not needed, only lock recsources
+
+            ws2812b_grid_fill_color(color, 0, 0);
+            ws2812b_grid_refresh();
+
+            ws2812b_grid_release();
+        }
+
+        /* Cap */
+        xTaskDelayUntil(&xLastWakeTime, target_interval_refresh_ticks);
+        
+        ++color;
+        if(color >= 255) {
+            color = 0;
+        }
+    }
+}
+
 esp_err_t ws2812b_grid_init() {
     ESP_LOGI(TAG, "Attempt to allocate DMA MEM %u B... Available=%u B.", 
         LEDSTRIP_REQUIRED_BUFFER_SIZE, heap_caps_get_free_size(MALLOC_CAP_DMA));
     // transfer_buffer = heap_caps_malloc(LEDSTRIP_REQUIRED_BUFFER_SIZE, MALLOC_CAP_DMA);
     // assert(transfer_buffer);
     memset(transfer_buffer, 0, LEDSTRIP_REQUIRED_BUFFER_SIZE);
+
+    ws2812b_grid_interface_mutex = xSemaphoreCreateMutex();
+    assert(ws2812b_grid_interface_mutex);
     
     esp_err_t ret;
     spi_bus_config_t buscfg = {
@@ -129,6 +172,7 @@ esp_err_t ws2812b_grid_init() {
         .queue_size = 1,  
         .pre_cb = NULL, //Specify pre-transfer callback to handle
     };
+
     //Initialize the SPI bus
     ret = spi_bus_initialize(LEDS_HOST, &buscfg, SPI_DMA_CH_AUTO);
     ESP_ERROR_CHECK(ret);
@@ -137,7 +181,7 @@ esp_err_t ws2812b_grid_init() {
     ret = spi_bus_add_device(LEDS_HOST, &devcfg, &spi);
     ESP_ERROR_CHECK(ret);
 
-    const float estimated_transfer_duration_ms = BIT_RESOLUTION * LEDSTRIP_REQUIRED_BUFFER_SIZE * 1000.0F / ((float)SPI_CLK_FREQ);
+    const float estimated_transfer_duration_ms = LEDSTRIP_REQUIRED_BUFFER_SIZE * 1000.0F / ((float)SPI_CLK_FREQ);
     ESP_LOGI(TAG, "Created LED strip driver. LEDs_count=%u, total_bytes=%u, SPI_transfer_size=%u. Transfer should take %f ms.",
         LEDS_COUNT, LEDSTRIP_REQUIRED_BUFFER_SIZE, TRANSACTION_BUFFER_SIZE, estimated_transfer_duration_ms
     );
@@ -145,100 +189,64 @@ esp_err_t ws2812b_grid_init() {
 
     t1 = esp_timer_get_time();
 
-        spi_device_acquire_bus(spi, portMAX_DELAY);
+    spi_device_acquire_bus(spi, portMAX_DELAY);
 
     t2 = esp_timer_get_time();
 
-        ws2812b_grid_fill_color(0, 0, 32+2+1);
+    ws2812b_grid_fill_color(0, 0, 0);
 
     t3 = esp_timer_get_time();
 
-        ws2812b_grid_refresh();
+    ws2812b_grid_refresh();
 
     t4 = esp_timer_get_time();
-
-        spi_device_release_bus(spi);
+        
+    // spi_transaction_t* transaction = NULL;
+    // //Wait for all transactions to be done and get back the results.
+    // for (size_t transaction_idx = 0; transaction_idx < 6; ++transaction_idx) {
+    //     ret = spi_device_get_trans_result(spi, &transaction, portMAX_DELAY);
+    //     assert(ret == ESP_OK);
+    // }
 
     t5 = esp_timer_get_time();
 
+    spi_device_release_bus(spi);
 
     t6 = esp_timer_get_time();
     
-    ESP_LOGW(TAG, "A: %lld, B:%lld, C:%lld, D:%lld, E:%lld", t2-t1, t3-t2, t4-t3, t5-t4, t6-t5);
+    ESP_LOGI(TAG, "Initial draw done! Timings[us]: aquire=%lld, draw:%lld, init_transfer:%lld, duration:%lld, release:%lld", t2-t1, t3-t2, t4-t3, t5-t4, t6-t5);
 
+    const bool ws2812b_grid_was_created = xTaskCreate(
+        ws2812b_grid_task, 
+        "ws2812b_grid_task", 
+        1024 * 4, 
+        NULL, 
+        20, 
+        NULL
+    ) == pdTRUE;
+    ESP_RETURN_ON_FALSE(ws2812b_grid_was_created, ESP_FAIL, TAG, "Failed creating \'ws2812b_grid_task\'!");
+
+    ESP_LOGI(TAG, "Task created successfully!");
     return ESP_OK;
+}
+
+bool ws2812b_grid_access(ws2812b_grid_interface_t** ws2812b_grid_if, TickType_t timeout_tick_time) {
+    if(!ws2812b_grid_interface_mutex) {
+        ESP_LOGW(TAG, "Failed aquiring interface. Reason NULL");
+        return false;
+    }
+
+    const bool accessed = xSemaphoreTake(ws2812b_grid_interface_mutex, timeout_tick_time) == pdTRUE ? true : false;
+    *ws2812b_grid_if = &ws2812b_grid_interface;
+    if(!accessed) {
+        ESP_LOGW(TAG, "Failed aquiring interface. Reason Semaphore");
+    }
+    return accessed;
+}
+
+void ws2812b_grid_release() {
+    xSemaphoreGive(ws2812b_grid_interface_mutex);
 }
 
 
 
-
-
-
-
-
-
-
-
-
-
-// static led_strip_handle_t led_strip;
-// // 10MHz resolution, 1 tick = 0.1us (led strip needs a high resolution)
-// #define LED_STRIP_RMT_RES_HZ  (10 * 1000 * 1000)
-// esp_err_t ws2812b_grid_init() {
-
-//     /* LED strip initialization with the GPIO and pixels number*/
-//     led_strip_config_t strip_config = {
-//         .strip_gpio_num = LEDSTRIP_GPIO, // The GPIO that connected to the LED strip's data line
-//         .max_leds = LEDSTRIP_LEDS_COUNT, // The number of LEDs in the strip,
-//         .led_pixel_format = LED_PIXEL_FORMAT_GRB, // Pixel format of your LED strip
-//         .led_model = LED_MODEL_WS2812, // LED strip model
-//         .flags.invert_out = false, // whether to invert the output signal (useful when your hardware has a level inverter)
-//     };
-
-//     led_strip_rmt_config_t rmt_config = {
-//     #if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 0, 0)
-//         .rmt_channel = 0,
-//     #else
-//         .clk_src = RMT_CLK_SRC_DEFAULT, // different clock source can lead to different power consumption
-//         .resolution_hz = LED_STRIP_RMT_RES_HZ,
-//         .flags.with_dma = true, // whether to enable the DMA feature
-//     #endif
-//     };
-    
-//     int64_t t1, t2, t3, t4, t5, t6;
-
-//     t1 = esp_timer_get_time();
-
-//     esp_err_t ret = led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip);
-//     ESP_RETURN_ON_ERROR(ret, TAG, "Creating LED Strip driver failed");
-
-//     t2 = esp_timer_get_time();
-
-//     for (size_t pixel_idx = 0; pixel_idx < LEDSTRIP_LEDS_COUNT; ++pixel_idx) {
-//         ret = led_strip_set_pixel(led_strip, pixel_idx, 0, pixel_idx % 120, 0);
-//         ESP_RETURN_ON_ERROR(ret, TAG, "Setting LED Strip pixel %u failed", pixel_idx);  
-//     }
-
-//     t3 = esp_timer_get_time();
-    
-//     ret = led_strip_refresh(led_strip);
-//     ESP_RETURN_ON_ERROR(ret, TAG, "Refreshing LED Strip failed");
-
-//     t4 = esp_timer_get_time();
-
-//         for (size_t pixel_idx = 0; pixel_idx < LEDSTRIP_LEDS_COUNT; ++pixel_idx) {
-//         ret = led_strip_set_pixel(led_strip, pixel_idx, 0, 0, pixel_idx % 80);
-//         ESP_RETURN_ON_ERROR(ret, TAG, "Setting LED Strip pixel %u failed", pixel_idx);  
-//     }
-
-//     t5 = esp_timer_get_time();
-    
-//     ret = led_strip_refresh(led_strip);
-//     ESP_RETURN_ON_ERROR(ret, TAG, "Refreshing LED Strip failed");
-
-//     t6 = esp_timer_get_time();
-
-//     ESP_LOGI(TAG, "Created LED strip object with RMT backend");
-//     ESP_LOGW(TAG, "Create: %lld, set:%lld, refr:%lld, set:%lld, refr:%lld", t2-t1, t3-t2, t4-t3, t5-t4, t6-t5);
-//     return ESP_OK;
-// }
