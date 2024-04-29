@@ -57,6 +57,7 @@
         "heap_private.h": "c",
         "esp_system.h": "c",
         "multi_heap.h": "c",
-        "esp_heap_caps.h": "c"
+        "esp_heap_caps.h": "c",
+        "random": "c"
     }
 }

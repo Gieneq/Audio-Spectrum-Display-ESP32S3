@@ -103,6 +103,17 @@ static void ws2812b_grid_fill_color(uint8_t r, uint8_t g, uint8_t b) {
     }
 }
 
+static void ws2812b_draw_matrix_in_zigzak(const led_matrix_t* led_matrix) {
+    const uint8_t column_0_height = led_matrix->columns_heights[0] / 2;
+    for (size_t pixel_idx = 0; pixel_idx < 7; ++pixel_idx) {
+        if(pixel_idx < column_0_height) {
+            ws2812b_grid_set_pixel(pixel_idx, 64, 0, 0);
+        } else {
+            ws2812b_grid_set_pixel(pixel_idx, 0, 0, 0);
+        }
+    }
+}
+
 static void ws2812b_grid_refresh() {
     esp_err_t ret;
 
@@ -118,19 +129,21 @@ static void ws2812b_grid_refresh() {
     }
 }
 
+static void ws2812b_grid_set_led_matrix_values(const led_matrix_t* led_mx) {
+    memcpy(&led_matrix, led_mx, sizeof(led_matrix_t));
+}
+
 static void ws2812b_grid_task(void* params) {
     
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t target_interval_refresh_ticks = (LEDSTRIP_TARGET_DRAW_INTERVAL) / 10;
-
-    uint8_t color = 0;
 
     while(1) {
         ws2812b_grid_interface_t* grid_if = NULL;
         if (ws2812b_grid_access(&grid_if, portMAX_DELAY)) {
             (void)grid_if; //not needed, only lock recsources
 
-            ws2812b_grid_fill_color(color, 0, 0);
+            ws2812b_draw_matrix_in_zigzak(&led_matrix);
             ws2812b_grid_refresh();
 
             ws2812b_grid_release();
@@ -138,11 +151,6 @@ static void ws2812b_grid_task(void* params) {
 
         /* Cap */
         xTaskDelayUntil(&xLastWakeTime, target_interval_refresh_ticks);
-        
-        ++color;
-        if(color >= 255) {
-            color = 0;
-        }
     }
 }
 
@@ -155,6 +163,8 @@ esp_err_t ws2812b_grid_init() {
 
     ws2812b_grid_interface_mutex = xSemaphoreCreateMutex();
     assert(ws2812b_grid_interface_mutex);
+
+    ws2812b_grid_interface.set_led_matrix_values = ws2812b_grid_set_led_matrix_values;
     
     esp_err_t ret;
     spi_bus_config_t buscfg = {

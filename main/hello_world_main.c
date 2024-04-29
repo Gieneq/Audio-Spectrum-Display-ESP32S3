@@ -128,19 +128,17 @@ static void process_results_draw_effect(
 
         led_matrix.columns_heights[bar_idx] = (uint8_t)((int32_t)*height);
     }
-    
-
-    // for(uint16_t col_idx = 0; col_idx < LED_MATRIX_COLUMNS; ++col_idx) {
-    //     const float raw_valuef = bins[col_idx];
-    //     const uint16_t raw_value = raw_valuef < 0.0F ? 0 : (uint16_t)(raw_valuef);
-    //     const uint16_t col_height = raw_value > LED_MATRIX_ROWS ? LED_MATRIX_ROWS : raw_value;
-    //     led_matrix.columns_heights[col_idx] = col_height;
-    // }
 
     model_interface_t* model_if = NULL;
     if (model_interface_access(&model_if, portMAX_DELAY)) {
         model_if->set_led_matrix_values(&led_matrix);
         model_interface_release();
+    }
+
+    ws2812b_grid_interface_t* grid_if = NULL;
+    if (ws2812b_grid_access(&grid_if, portMAX_DELAY)) {
+        grid_if->set_led_matrix_values(&led_matrix);
+        ws2812b_grid_release();
     }
 }
 
