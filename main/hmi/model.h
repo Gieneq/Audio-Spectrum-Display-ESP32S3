@@ -18,8 +18,8 @@ typedef struct model_interface_t {
     void (*set_left_button_clicked)(bool clicked);
     void (*set_middle_button_clicked)(bool clicked);
     void (*set_right_button_clicked)(bool clicked);
-    float(*set_option_selected)(option_select_t option);
-    float(*set_gain)(float g);
+    void (*set_option_selected)(option_select_t option);
+    void (*set_gain)(float g);
 } model_interface_t;
 
 bool model_interface_access(model_interface_t** model_if, TickType_t timeout_tick_time);

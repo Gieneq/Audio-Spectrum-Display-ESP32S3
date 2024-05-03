@@ -165,16 +165,34 @@ void model_draw(gdisplay_api_t* gd_api) {
         assert(LED_MATRIX_COLUMNS == VIS_BARS_COUNT);
         assert(LED_MATRIX_ROWS == VIS_ROWS_COUNT);
 
-        for(size_t row_idx = 0; row_idx < VIS_ROWS_COUNT; ++row_idx) {
-            for(size_t bar_idx = 0; bar_idx < VIS_BARS_COUNT; ++bar_idx) {
-                const bool bar_colored = *led_matrix_access_column_height_at(&(get_model()->led_matrix), bar_idx) <= row_idx;
-                gd_api->draw_rect(
-                    VIS_X + VIS_BAR_HGAP + bar_idx * (VIS_BLOCK_WIDTH  + VIS_BAR_HGAP),
-                    VIS_Y + VIS_BAR_VGAP + row_idx * (VIS_BLOCK_HEIGHT + VIS_BAR_VGAP), 
-                    VIS_BLOCK_WIDTH, 
-                    VIS_BLOCK_HEIGHT, 
-                    bar_colored == true ? VIS_BLOCK_ON_COLOR : VIS_BLOCK_OFF_COLOR
-                );
+        if ((get_model()->led_matrix.flags & LED_MATRIX_HAS_COLOR) > 0) {
+            for(size_t row_idx = 0; row_idx < VIS_ROWS_COUNT; ++row_idx) {
+                for(size_t bar_idx = 0; bar_idx < VIS_BARS_COUNT; ++bar_idx) {
+                    const color_24b_t* matrix_color = led_matrix_access_pixel_at(&(get_model()->led_matrix), bar_idx, row_idx);
+                    const uint16_t color_raw = ((matrix_color->red >> 3) << (6+5)) | ((matrix_color->green >> 2) << 5) | ((matrix_color->blue >> 3));
+                    const uint16_t display_color = 0xFFFF - GREV(color_raw);
+
+                    gd_api->draw_rect(
+                        VIS_X + VIS_BAR_HGAP + bar_idx * (VIS_BLOCK_WIDTH  + VIS_BAR_HGAP),
+                        VIS_Y + VIS_BAR_VGAP + row_idx * (VIS_BLOCK_HEIGHT + VIS_BAR_VGAP), 
+                        VIS_BLOCK_WIDTH, 
+                        VIS_BLOCK_HEIGHT, 
+                        display_color
+                    );
+                }
+            }
+        } else {
+            for(size_t row_idx = 0; row_idx < VIS_ROWS_COUNT; ++row_idx) {
+                for(size_t bar_idx = 0; bar_idx < VIS_BARS_COUNT; ++bar_idx) {
+                    const bool bar_colored = *led_matrix_access_column_height_at(&(get_model()->led_matrix), bar_idx) <= row_idx;
+                    gd_api->draw_rect(
+                        VIS_X + VIS_BAR_HGAP + bar_idx * (VIS_BLOCK_WIDTH  + VIS_BAR_HGAP),
+                        VIS_Y + VIS_BAR_VGAP + row_idx * (VIS_BLOCK_HEIGHT + VIS_BAR_VGAP), 
+                        VIS_BLOCK_WIDTH, 
+                        VIS_BLOCK_HEIGHT, 
+                        bar_colored == true ? VIS_BLOCK_ON_COLOR : VIS_BLOCK_OFF_COLOR
+                    );
+                }
             }
         }
     

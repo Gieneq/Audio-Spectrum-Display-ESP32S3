@@ -14,6 +14,13 @@ typedef enum option_select_t {
     OPTION_SELECT_COUNT,
 } option_select_t;
 
+typedef enum effect_select_t {
+    EFFECT_SELECT_RAW,
+    EFFECT_SELECT_COLORS,
+
+    EFFECT_SELECT_COUNT,
+} effect_select_t;
+
 typedef struct color_16b_t {    union {
         uint16_t value;  // Access the whole 16-bit value
         struct {

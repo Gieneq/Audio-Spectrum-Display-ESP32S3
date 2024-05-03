@@ -34,6 +34,7 @@ const float gravity_acceleration = -60.0F;
 
 static float ampl_gain = 1.0F;
 static option_select_t recent_option_selected = OPTION_SELECT_GAIN;
+static effect_select_t recent_effect_selected = EFFECT_SELECT_RAW;
 
 static void info_prints() {
     /* Print chip information */
@@ -104,30 +105,106 @@ static void process_results_draw_effect(
         // printf("]\n");
     }
 
+    switch (recent_effect_selected) {
 
-    /* Apply gravity and velocity */
-    for (size_t bar_idx = 0; bar_idx < LED_MATRIX_COLUMNS; bar_idx++) {
+    case EFFECT_SELECT_RAW: {
+        led_matrix.flags &= ~LED_MATRIX_HAS_COLOR;
 
-        // /* Base vel clamped to 0 to 5000, only positive */
-        float bin_base_vel = CONSTRAIN(bins_grad[bar_idx], 0.0F, 5000.0F);
+        /* Apply gravity and velocity */
+        for (size_t bar_idx = 0; bar_idx < LED_MATRIX_COLUMNS; bar_idx++) {
 
-        // /* Base vel scaled: 0 to 5000 / 32 = 156.25 */
-        // bin_base_vel /= 16;
+            // /* Base vel clamped to 0 to 5000, only positive */
+            float bin_base_vel = CONSTRAIN(bins_grad[bar_idx], 0.0F, 5000.0F);
 
-        float* height = &heights[bar_idx];
-        float* velocity = &velocities[bar_idx];
+            // /* Base vel scaled: 0 to 5000 / 32 = 156.25 */
+            // bin_base_vel /= 16;
 
-        /* Apply gravity */
-        *velocity += gravity_acceleration * delta_time;
-        if(*height <= 0.0F) {
-            *velocity = 0.0F;
+            float* height = &heights[bar_idx];
+            float* velocity = &velocities[bar_idx];
+
+            /* Apply gravity */
+            *velocity += gravity_acceleration * delta_time;
+            if(*height <= 0.0F) {
+                *velocity = 0.0F;
+            }
+
+            *height += ((*velocity + bin_base_vel) * delta_time);
+            *height = CONSTRAIN(*height, 0.0F, (float)LED_MATRIX_ROWS);
+
+            led_matrix.columns_heights[bar_idx] = (uint8_t)((int32_t)*height);
         }
-
-        *height += ((*velocity + bin_base_vel) * delta_time);
-        *height = CONSTRAIN(*height, 0.0F, (float)LED_MATRIX_ROWS);
-
-        led_matrix.columns_heights[bar_idx] = (uint8_t)((int32_t)*height);
+        break;
     }
+    
+    default: {
+        led_matrix.flags |= LED_MATRIX_HAS_COLOR;
+        
+        /* Apply gravity and velocity */
+        for (size_t bar_idx = 0; bar_idx < LED_MATRIX_COLUMNS; bar_idx++) {
+
+            // /* Base vel clamped to 0 to 5000, only positive */
+            float bin_base_vel = CONSTRAIN(bins_grad[bar_idx], 0.0F, 5000.0F);
+
+            // /* Base vel scaled: 0 to 5000 / 32 = 156.25 */
+            // bin_base_vel /= 16;
+
+            float* height = &heights[bar_idx];
+            float* velocity = &velocities[bar_idx];
+
+            /* Apply gravity */
+            *velocity += gravity_acceleration * delta_time;
+            if(*height <= 0.0F) {
+                *velocity = 0.0F;
+            }
+
+            *height += ((*velocity + bin_base_vel) * delta_time);
+            *height = CONSTRAIN(*height, 0.0F, (float)LED_MATRIX_ROWS);
+
+            led_matrix.columns_heights[bar_idx] = (uint8_t)((int32_t)*height);
+
+            /* Add color to it */
+            for (size_t row_idx = 0; row_idx < LED_MATRIX_ROWS; row_idx++) {
+                //todo apply colors
+
+                uint8_t red = 0, green = 0, blue = 0;
+
+                if(row_idx < 5) {
+                    red = 0x00;
+                    green = 0xFF;
+                    blue = 0x20;
+                }
+                else if(row_idx < 9) {
+                    red = 0x60;
+                    green = 0xA0;
+                    blue = 0x10;
+                }
+                else if(row_idx < 13) {
+                    red = 0xA0;
+                    green = 0x80;
+                    blue = 0x00;
+                } 
+                else {
+                    red = 0xFF;
+                    green = 0x00;
+                    blue = 0x00;
+                }
+
+                const bool set_color = row_idx < led_matrix.columns_heights[bar_idx];
+                led_matrix.pixels[row_idx * LED_MATRIX_COLUMNS + bar_idx].red = 
+                    set_color ? red : 0x00;
+
+                led_matrix.pixels[row_idx * LED_MATRIX_COLUMNS + bar_idx].green = 
+                    set_color ? green : 0x00;
+
+                led_matrix.pixels[row_idx * LED_MATRIX_COLUMNS + bar_idx].blue = 
+                    set_color ? blue : 0x00;
+            }
+        }
+        break;
+    }
+    }
+
+
 
     model_interface_t* model_if = NULL;
     if (model_interface_access(&model_if, portMAX_DELAY)) {
@@ -184,10 +261,21 @@ static void button_left_released_callback(void *arg, void *data) {
     if (model_interface_access(&model_if, portMAX_DELAY)) {
         model_if->set_left_button_clicked(false);
 
-        if (recent_option_selected == OPTION_SELECT_GAIN) {
+        switch (recent_option_selected) {
+        case OPTION_SELECT_GAIN:
             ampl_gain *= 0.9F;
             gsampler_set_gain(ampl_gain);
             model_if->set_gain(ampl_gain);
+            ESP_LOGI(TAG, "Gain decresed to: %f.", ampl_gain);
+            break;
+        case OPTION_SELECT_EFFECT:
+            /* Loop left selected effect */
+            --recent_effect_selected;
+            recent_effect_selected %= EFFECT_SELECT_COUNT;
+            ESP_LOGI(TAG, "Effect loop left to: %d.", recent_effect_selected);
+            break;
+        default:
+            break;
         }
 
         model_interface_release();
@@ -230,10 +318,21 @@ static void button_right_released_callback(void *arg, void *data) {
     if (model_interface_access(&model_if, portMAX_DELAY)) {
         model_if->set_right_button_clicked(false);
 
-        if (recent_option_selected == OPTION_SELECT_GAIN) {
+        switch (recent_option_selected) {
+        case OPTION_SELECT_GAIN:
             ampl_gain *= 1.1F;
             gsampler_set_gain(ampl_gain);
             model_if->set_gain(ampl_gain);
+            ESP_LOGI(TAG, "Gain increased to: %f.", ampl_gain);
+            break;
+        case OPTION_SELECT_EFFECT:
+            /* Loop right selected effect */
+            ++recent_effect_selected;
+            recent_effect_selected %= EFFECT_SELECT_COUNT;
+            ESP_LOGI(TAG, "Effect loop right to: %d.", recent_effect_selected);
+            break;
+        default:
+            break;
         }
 
         model_interface_release();

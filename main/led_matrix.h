@@ -11,12 +11,15 @@ extern "C" {
 #define LED_MATRIX_ROWS         (19)
 #define LED_MATRIX_PIXELS_COUNT (LED_MATRIX_COLUMNS * LED_MATRIX_ROWS)
 
+#define LED_MATRIX_HAS_COLOR    (1<<0)
+
 typedef struct led_matrix_t {
     color_24b_t pixels[LED_MATRIX_PIXELS_COUNT];
     uint8_t columns_heights[LED_MATRIX_COLUMNS];
     uint16_t columns;
     uint16_t rows;
     uint16_t pixels_count;
+    uint8_t flags;
     // void (*clear)();
     // color_24b_t (*get_pixel_at)(uint16_t x, uint16_t y);
     // color_24b_t (*get_column_height_at)(uint16_t x, uint16_t y);
