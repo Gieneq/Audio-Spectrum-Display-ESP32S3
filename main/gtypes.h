@@ -16,7 +16,10 @@ typedef enum option_select_t {
 
 typedef enum effect_select_t {
     EFFECT_SELECT_RAW,
-    EFFECT_SELECT_COLORS,
+    EFFECT_SELECT_TRIBARS,
+    EFFECT_SELECT_BLUEVIOLET,
+    EFFECT_SELECT_WHITEBLOCKS,
+    EFFECT_SELECT_ARCADE,
 
     EFFECT_SELECT_COUNT,
 } effect_select_t;

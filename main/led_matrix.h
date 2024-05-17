@@ -7,8 +7,8 @@ extern "C" {
 #include "esp_err.h"
 #include "gtypes.h"
 
-#define LED_MATRIX_COLUMNS      (21)
-#define LED_MATRIX_ROWS         (19)
+#define LED_MATRIX_COLUMNS      (19)
+#define LED_MATRIX_ROWS         (21)
 #define LED_MATRIX_PIXELS_COUNT (LED_MATRIX_COLUMNS * LED_MATRIX_ROWS)
 
 #define LED_MATRIX_HAS_COLOR    (1<<0)

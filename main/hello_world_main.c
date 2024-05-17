@@ -86,6 +86,8 @@ static void process_results_draw_effect(
     bool beat
 ) {
 
+    static const color_24b_t color_black = {0};
+    static const color_24b_t color_white = {.red = 0xFF, .green = 0xFF, .blue = 0xFF};
 
     static int log_counter;
     if(++log_counter >= 10) {
@@ -105,103 +107,138 @@ static void process_results_draw_effect(
         // printf("]\n");
     }
 
+    /* All effect needs this stage */
+    for (size_t bar_idx = 0; bar_idx < LED_MATRIX_COLUMNS; bar_idx++) {
+
+        /* Base vel clamped to 0 to 5000, only positive */
+        float bin_base_vel = CONSTRAIN(bins_grad[bar_idx], 0.0F, 5000.0F);
+
+        float* height = &heights[bar_idx];
+        float* velocity = &velocities[bar_idx];
+
+        /* Apply gravity */
+        *velocity += gravity_acceleration * delta_time;
+        if(*height <= 0.0F) {
+            *velocity = 0.0F;
+        }
+
+        *height += ((*velocity + bin_base_vel) * delta_time);
+        *height = CONSTRAIN(*height, 0.0F, (float)LED_MATRIX_ROWS);
+
+        led_matrix.columns_heights[bar_idx] = (uint8_t)((int32_t)*height);
+    }
+
     switch (recent_effect_selected) {
 
-    case EFFECT_SELECT_RAW: {
-        led_matrix.flags &= ~LED_MATRIX_HAS_COLOR;
+        case EFFECT_SELECT_TRIBARS: {
+            led_matrix.flags |= LED_MATRIX_HAS_COLOR;
 
-        /* Apply gravity and velocity */
-        for (size_t bar_idx = 0; bar_idx < LED_MATRIX_COLUMNS; bar_idx++) {
+            /* Translate heights to colors */
+            static const color_24b_t colors[3] = {
+                {.red = 0x20, .green = 0xFF, .blue = 0x00},
+                {.red = 0xE0, .green = 0xC0, .blue = 0x00},
+                {.red = 0xFF, .green = 0x20, .blue = 0x00},
+            };
+            
+            for (size_t bar_idx = 0; bar_idx < LED_MATRIX_COLUMNS; bar_idx++) {
+                for (size_t row_idx = 0; row_idx < LED_MATRIX_ROWS; row_idx++) {
 
-            // /* Base vel clamped to 0 to 5000, only positive */
-            float bin_base_vel = CONSTRAIN(bins_grad[bar_idx], 0.0F, 5000.0F);
+                    const uint8_t color_idx = 
+                        row_idx < 5 ? 0 :
+                        row_idx < 10 ? 1 :
+                        2;
 
-            // /* Base vel scaled: 0 to 5000 / 32 = 156.25 */
-            // bin_base_vel /= 16;
-
-            float* height = &heights[bar_idx];
-            float* velocity = &velocities[bar_idx];
-
-            /* Apply gravity */
-            *velocity += gravity_acceleration * delta_time;
-            if(*height <= 0.0F) {
-                *velocity = 0.0F;
+                    const bool set_color = row_idx < led_matrix.columns_heights[bar_idx];
+                    led_matrix.pixels[row_idx * LED_MATRIX_COLUMNS + bar_idx] = 
+                        set_color ? colors[color_idx] : color_black;
+                }
             }
-
-            *height += ((*velocity + bin_base_vel) * delta_time);
-            *height = CONSTRAIN(*height, 0.0F, (float)LED_MATRIX_ROWS);
-
-            led_matrix.columns_heights[bar_idx] = (uint8_t)((int32_t)*height);
+            break;
         }
-        break;
-    }
-    
-    default: {
-        led_matrix.flags |= LED_MATRIX_HAS_COLOR;
         
-        /* Apply gravity and velocity */
-        for (size_t bar_idx = 0; bar_idx < LED_MATRIX_COLUMNS; bar_idx++) {
+        case EFFECT_SELECT_BLUEVIOLET: {
+            led_matrix.flags |= LED_MATRIX_HAS_COLOR;
+            static const color_24b_t colors[LED_MATRIX_ROWS] = {
+                {.red = 0xF0, .green = 0xF0, .blue = 0xF0},
+                {.red = 0xE0, .green = 0xE0, .blue = 0xE0},
+                {.red = 0xC0, .green = 0x80, .blue = 0xD0},
+                {.red = 0xB0, .green = 0x40, .blue = 0xC0},
+                {.red = 0x80, .green = 0x00, .blue = 0xB8},
+                
+                {.red = 0x60, .green = 0x00, .blue = 0xB0},
+                {.red = 0x50, .green = 0x00, .blue = 0xB0},
+                {.red = 0x40, .green = 0x00, .blue = 0xA8},
+                {.red = 0x30, .green = 0x00, .blue = 0xA0},
+                {.red = 0x20, .green = 0x00, .blue = 0x98},
+                
+                {.red = 0x18, .green = 0x00, .blue = 0x90},
+                {.red = 0x10, .green = 0x00, .blue = 0x88},
+                {.red = 0x08, .green = 0x00, .blue = 0x80},
+                {.red = 0x00, .green = 0x00, .blue = 0x78},
+                {.red = 0x00, .green = 0x00, .blue = 0x70},
+                
+                {.red = 0x00, .green = 0x00, .blue = 0x68},
+                {.red = 0x00, .green = 0x00, .blue = 0x60},
+                {.red = 0x00, .green = 0x00, .blue = 0x58},
+                {.red = 0x00, .green = 0x00, .blue = 0x50},
+            };
+            
+            for (size_t bar_idx = 0; bar_idx < LED_MATRIX_COLUMNS; bar_idx++) {
+                for (size_t row_idx = 0; row_idx < LED_MATRIX_ROWS; row_idx++) {
 
-            // /* Base vel clamped to 0 to 5000, only positive */
-            float bin_base_vel = CONSTRAIN(bins_grad[bar_idx], 0.0F, 5000.0F);
+                    uint8_t color_idx = LED_MATRIX_ROWS - (led_matrix.columns_heights[bar_idx] - row_idx - 1);
+                    // uint8_t color_idx = led_matrix.columns_heights[bar_idx] - row_idx
+                    if (color_idx >= LED_MATRIX_ROWS) {
+                        color_idx = LED_MATRIX_ROWS - 1;
+                    }
+                    //todo no need to chekc
 
-            // /* Base vel scaled: 0 to 5000 / 32 = 156.25 */
-            // bin_base_vel /= 16;
-
-            float* height = &heights[bar_idx];
-            float* velocity = &velocities[bar_idx];
-
-            /* Apply gravity */
-            *velocity += gravity_acceleration * delta_time;
-            if(*height <= 0.0F) {
-                *velocity = 0.0F;
+                    const bool set_color = row_idx < led_matrix.columns_heights[bar_idx];
+                    led_matrix.pixels[row_idx * LED_MATRIX_COLUMNS + bar_idx] = 
+                        set_color ? colors[color_idx] : color_black;
+                }
             }
 
-            *height += ((*velocity + bin_base_vel) * delta_time);
-            *height = CONSTRAIN(*height, 0.0F, (float)LED_MATRIX_ROWS);
-
-            led_matrix.columns_heights[bar_idx] = (uint8_t)((int32_t)*height);
-
-            /* Add color to it */
-            for (size_t row_idx = 0; row_idx < LED_MATRIX_ROWS; row_idx++) {
-                //todo apply colors
-
-                uint8_t red = 0, green = 0, blue = 0;
-
-                if(row_idx < 5) {
-                    red = 0x00;
-                    green = 0xFF;
-                    blue = 0x20;
-                }
-                else if(row_idx < 9) {
-                    red = 0x60;
-                    green = 0xA0;
-                    blue = 0x10;
-                }
-                else if(row_idx < 13) {
-                    red = 0xA0;
-                    green = 0x80;
-                    blue = 0x00;
-                } 
-                else {
-                    red = 0xFF;
-                    green = 0x00;
-                    blue = 0x00;
-                }
-
-                const bool set_color = row_idx < led_matrix.columns_heights[bar_idx];
-                led_matrix.pixels[row_idx * LED_MATRIX_COLUMNS + bar_idx].red = 
-                    set_color ? red : 0x00;
-
-                led_matrix.pixels[row_idx * LED_MATRIX_COLUMNS + bar_idx].green = 
-                    set_color ? green : 0x00;
-
-                led_matrix.pixels[row_idx * LED_MATRIX_COLUMNS + bar_idx].blue = 
-                    set_color ? blue : 0x00;
-            }
+            break;
         }
-        break;
-    }
+        
+        case EFFECT_SELECT_WHITEBLOCKS: {
+            led_matrix.flags |= LED_MATRIX_HAS_COLOR;
+
+            for (size_t bar_idx = 0; bar_idx < LED_MATRIX_COLUMNS; bar_idx++) {
+                for (size_t row_idx = 0; row_idx < LED_MATRIX_ROWS; row_idx++) {
+                    //todo
+                    const bool set_color = row_idx == led_matrix.columns_heights[bar_idx];
+                    led_matrix.pixels[row_idx * LED_MATRIX_COLUMNS + bar_idx] = 
+                        set_color ? color_white : color_black;
+                }
+            }
+
+            break;
+        }
+        
+        case EFFECT_SELECT_ARCADE: {
+            led_matrix.flags |= LED_MATRIX_HAS_COLOR;
+
+            for (size_t bar_idx = 0; bar_idx < LED_MATRIX_COLUMNS; bar_idx++) {
+                for (size_t row_idx = 0; row_idx < LED_MATRIX_ROWS; row_idx++) {
+                    //todo
+                    const bool set_color = row_idx == led_matrix.columns_heights[bar_idx];
+                    led_matrix.pixels[row_idx * LED_MATRIX_COLUMNS + bar_idx] = 
+                        set_color ? color_white : color_black;
+                }
+            }
+
+            break;
+        }
+
+        default: {
+            led_matrix.flags &= ~LED_MATRIX_HAS_COLOR;
+
+            /* Nothing more than using heights */
+
+            break;
+        }
     }
 
 

@@ -21,8 +21,8 @@
 
 #define LEDSTRIP_GPIO                   39
 
-#define LEDS_GRID_W                     (21)
-#define LEDS_GRID_H                     (19)
+#define LEDS_GRID_W                     (19)
+#define LEDS_GRID_H                     (21)
 
 #define LEDS_COUNT                      (LEDS_GRID_W * LEDS_GRID_H)
 #define COLORS_BITS                     (3 * 8)
@@ -90,6 +90,10 @@ static void ws2812b_grid_set_byte(uint16_t byte_index, uint8_t value) {
 }
 
 static void ws2812b_grid_set_pixel(uint16_t pixel_idx, uint8_t r, uint8_t g, uint8_t b) {
+    if(pixel_idx >= (LEDS_GRID_W * LEDS_GRID_H)) {
+        return;
+    }
+    
     /* Green */
     ws2812b_grid_set_byte(pixel_idx * 3 + 0, g);//0x80
     
@@ -107,9 +111,24 @@ static void ws2812b_grid_fill_color(uint8_t r, uint8_t g, uint8_t b) {
 }
 
 static void ws2812b_draw_pixel_in_zigzak(uint16_t x, uint16_t y, uint8_t r, uint8_t g, uint8_t b) {
+
+    /* Flip to start from left side of the display */
+    x = LEDS_GRID_W - x - 1;
+
+
     const bool reversed_column = (x % 2) != 0;
     if (reversed_column) {
         y = LEDS_GRID_H - y - 1;
+    }
+
+    if (y >= LEDS_GRID_H) {
+        // y = LEDS_GRID_H - 1;
+        return;
+    }
+
+    if (x >= LEDS_GRID_W) {
+        // x = LEDS_GRID_W - 1;
+        return;
     }
 
     const uint16_t pixel_idx = y + x * LEDS_GRID_H;
