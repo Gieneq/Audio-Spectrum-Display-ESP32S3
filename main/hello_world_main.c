@@ -23,9 +23,11 @@
 #include "gtypes.h"
 #include "leds/ws2812b_grid.h"
 
+#include "rf/rf_recv.h"
+
 static const char TAG[] = "Main";
 
-static led_matrix_t led_matrix;
+static led_matrix_t* led_matrix;
 
 static float heights[LED_MATRIX_COLUMNS];
 static float velocities[LED_MATRIX_COLUMNS];
@@ -125,13 +127,13 @@ static void process_results_draw_effect(
         *height += ((*velocity + bin_base_vel) * delta_time);
         *height = CONSTRAIN(*height, 0.0F, (float)LED_MATRIX_ROWS);
 
-        led_matrix.columns_heights[bar_idx] = (uint8_t)((int32_t)*height);
+        led_matrix->columns_heights[bar_idx] = (uint8_t)((int32_t)*height);
     }
 
     switch (recent_effect_selected) {
 
         case EFFECT_SELECT_TRIBARS: {
-            led_matrix.flags |= LED_MATRIX_HAS_COLOR;
+            led_matrix->flags |= LED_MATRIX_HAS_COLOR;
 
             /* Translate heights to colors */
             static const color_24b_t colors[3] = {
@@ -148,8 +150,8 @@ static void process_results_draw_effect(
                         row_idx < 10 ? 1 :
                         2;
 
-                    const bool set_color = row_idx < led_matrix.columns_heights[bar_idx];
-                    led_matrix.pixels[row_idx * LED_MATRIX_COLUMNS + bar_idx] = 
+                    const bool set_color = row_idx < led_matrix->columns_heights[bar_idx];
+                    led_matrix->pixels[row_idx * LED_MATRIX_COLUMNS + bar_idx] = 
                         set_color ? colors[color_idx] : color_black;
                 }
             }
@@ -157,7 +159,7 @@ static void process_results_draw_effect(
         }
         
         case EFFECT_SELECT_BLUEVIOLET: {
-            led_matrix.flags |= LED_MATRIX_HAS_COLOR;
+            led_matrix->flags |= LED_MATRIX_HAS_COLOR;
             static const color_24b_t colors[LED_MATRIX_ROWS] = {
                 {.red = 0xF0, .green = 0xF0, .blue = 0xF0},
                 {.red = 0xE0, .green = 0xE0, .blue = 0xE0},
@@ -186,15 +188,15 @@ static void process_results_draw_effect(
             for (size_t bar_idx = 0; bar_idx < LED_MATRIX_COLUMNS; bar_idx++) {
                 for (size_t row_idx = 0; row_idx < LED_MATRIX_ROWS; row_idx++) {
 
-                    uint8_t color_idx = LED_MATRIX_ROWS - (led_matrix.columns_heights[bar_idx] - row_idx - 1);
-                    // uint8_t color_idx = led_matrix.columns_heights[bar_idx] - row_idx
+                    uint8_t color_idx = LED_MATRIX_ROWS - (led_matrix->columns_heights[bar_idx] - row_idx - 1);
+                    // uint8_t color_idx = led_matrix->columns_heights[bar_idx] - row_idx
                     if (color_idx >= LED_MATRIX_ROWS) {
                         color_idx = LED_MATRIX_ROWS - 1;
                     }
                     //todo no need to chekc
 
-                    const bool set_color = row_idx < led_matrix.columns_heights[bar_idx];
-                    led_matrix.pixels[row_idx * LED_MATRIX_COLUMNS + bar_idx] = 
+                    const bool set_color = row_idx < led_matrix->columns_heights[bar_idx];
+                    led_matrix->pixels[row_idx * LED_MATRIX_COLUMNS + bar_idx] = 
                         set_color ? colors[color_idx] : color_black;
                 }
             }
@@ -203,13 +205,13 @@ static void process_results_draw_effect(
         }
         
         case EFFECT_SELECT_WHITEBLOCKS: {
-            led_matrix.flags |= LED_MATRIX_HAS_COLOR;
+            led_matrix->flags |= LED_MATRIX_HAS_COLOR;
 
             for (size_t bar_idx = 0; bar_idx < LED_MATRIX_COLUMNS; bar_idx++) {
                 for (size_t row_idx = 0; row_idx < LED_MATRIX_ROWS; row_idx++) {
                     //todo
-                    const bool set_color = row_idx == led_matrix.columns_heights[bar_idx];
-                    led_matrix.pixels[row_idx * LED_MATRIX_COLUMNS + bar_idx] = 
+                    const bool set_color = row_idx == led_matrix->columns_heights[bar_idx];
+                    led_matrix->pixels[row_idx * LED_MATRIX_COLUMNS + bar_idx] = 
                         set_color ? color_white : color_black;
                 }
             }
@@ -218,13 +220,13 @@ static void process_results_draw_effect(
         }
         
         case EFFECT_SELECT_ARCADE: {
-            led_matrix.flags |= LED_MATRIX_HAS_COLOR;
+            led_matrix->flags |= LED_MATRIX_HAS_COLOR;
 
             for (size_t bar_idx = 0; bar_idx < LED_MATRIX_COLUMNS; bar_idx++) {
                 for (size_t row_idx = 0; row_idx < LED_MATRIX_ROWS; row_idx++) {
                     //todo
-                    const bool set_color = row_idx == led_matrix.columns_heights[bar_idx];
-                    led_matrix.pixels[row_idx * LED_MATRIX_COLUMNS + bar_idx] = 
+                    const bool set_color = row_idx == led_matrix->columns_heights[bar_idx];
+                    led_matrix->pixels[row_idx * LED_MATRIX_COLUMNS + bar_idx] = 
                         set_color ? color_white : color_black;
                 }
             }
@@ -233,7 +235,7 @@ static void process_results_draw_effect(
         }
 
         default: {
-            led_matrix.flags &= ~LED_MATRIX_HAS_COLOR;
+            led_matrix->flags &= ~LED_MATRIX_HAS_COLOR;
 
             /* Nothing more than using heights */
 
@@ -245,13 +247,13 @@ static void process_results_draw_effect(
 
     model_interface_t* model_if = NULL;
     if (model_interface_access(&model_if, portMAX_DELAY)) {
-        model_if->set_led_matrix_values(&led_matrix);
+        model_if->set_led_matrix_values(led_matrix);
         model_interface_release();
     }
 
     ws2812b_grid_interface_t* grid_if = NULL;
     if (ws2812b_grid_access(&grid_if, portMAX_DELAY)) {
-        grid_if->set_led_matrix_values(&led_matrix);
+        grid_if->set_led_matrix_values(led_matrix);
         ws2812b_grid_release();
     }
 }
@@ -413,8 +415,11 @@ static const button_config_t adc_button_config[BUTTONS_COUNT] = {
 void app_main(void) {
     info_prints();
     ESP_LOGI(TAG, "Starting!");
-    
-    led_matrix_clear(&led_matrix);
+
+    led_matrix = heap_caps_calloc(1, sizeof(led_matrix_t ), MALLOC_CAP_SPIRAM);
+    assert(led_matrix);
+
+    led_matrix_clear(led_matrix);
     init_effect();
 
     esp_err_t ret = ESP_OK;
@@ -466,11 +471,21 @@ void app_main(void) {
     ret = iot_button_register_cb(front_buttons[ADC_BUTTON_RIGHT], BUTTON_PRESS_UP, button_right_released_callback, NULL);
     ESP_ERROR_CHECK(ret);
 
-    ESP_LOGI(TAG, "Free DMA space %u B", heap_caps_get_free_size(MALLOC_CAP_DMA));
-    ESP_LOGI(TAG, "Free SPIRAM space %u B", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
-    ESP_LOGI(TAG, "Free Internal space %u B", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    ESP_LOGI(TAG, "MEM available: Any=%u B, DMA=%u B, SPI=%u B.", 
+        heap_caps_get_free_size(MALLOC_CAP_8BIT),
+        heap_caps_get_free_size(MALLOC_CAP_DMA),
+        heap_caps_get_free_size(MALLOC_CAP_SPIRAM)
+    );
    
+    vTaskDelay(200);
+    rf_recv_start();
+
     while(1) {
-        vTaskDelay(500);
+        vTaskDelay(100);
+        ESP_LOGI(TAG, "MEM available: Any=%u B, DMA=%u B, SPI=%u B.", 
+            heap_caps_get_free_size(MALLOC_CAP_8BIT),
+            heap_caps_get_free_size(MALLOC_CAP_DMA),
+            heap_caps_get_free_size(MALLOC_CAP_SPIRAM)
+        );
     }
 }

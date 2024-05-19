@@ -51,7 +51,7 @@
 
 #define LEDSTRIP_TARGET_DRAW_INTERVAL  (40)
 
-static led_matrix_t led_matrix;
+static led_matrix_t* led_matrix;
 
 ws2812b_grid_interface_t ws2812b_grid_interface;
 static SemaphoreHandle_t ws2812b_grid_interface_mutex;
@@ -165,7 +165,7 @@ static void ws2812b_grid_refresh() {
 }
 
 static void ws2812b_grid_set_led_matrix_values(const led_matrix_t* led_mx) {
-    memcpy(&led_matrix, led_mx, sizeof(led_matrix_t));
+    memcpy(led_matrix, led_mx, sizeof(led_matrix_t));
 }
 
 static void ws2812b_grid_task(void* params) {
@@ -178,7 +178,7 @@ static void ws2812b_grid_task(void* params) {
         if (ws2812b_grid_access(&grid_if, portMAX_DELAY)) {
             (void)grid_if; //not needed, only lock recsources
 
-            ws2812b_draw_matrix_in_zigzak(&led_matrix);
+            ws2812b_draw_matrix_in_zigzak(led_matrix);
             ws2812b_grid_refresh();
 
             ws2812b_grid_release();
@@ -190,10 +190,10 @@ static void ws2812b_grid_task(void* params) {
 }
 
 esp_err_t ws2812b_grid_init() {
-    ESP_LOGI(TAG, "Attempt to allocate DMA MEM %u B... Available=%u B.", 
-        LEDSTRIP_REQUIRED_BUFFER_SIZE, heap_caps_get_free_size(MALLOC_CAP_DMA));
-    // transfer_buffer = heap_caps_malloc(LEDSTRIP_REQUIRED_BUFFER_SIZE, MALLOC_CAP_DMA);
-    // assert(transfer_buffer);
+
+    led_matrix = heap_caps_calloc(1, sizeof(led_matrix_t), MALLOC_CAP_SPIRAM);
+    assert(led_matrix);
+    
     memset(transfer_buffer, 0, LEDSTRIP_REQUIRED_BUFFER_SIZE);
 
     ws2812b_grid_interface_mutex = xSemaphoreCreateMutex();

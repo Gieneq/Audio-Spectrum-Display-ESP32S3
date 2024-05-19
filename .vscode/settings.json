@@ -58,6 +58,11 @@
         "esp_system.h": "c",
         "multi_heap.h": "c",
         "esp_heap_caps.h": "c",
-        "random": "c"
+        "random": "c",
+        "bt_app_core.h": "c",
+        "bt_app_av.h": "c",
+        "nvs.h": "c",
+        "nvs_flash.h": "c",
+        "sockets.h": "c"
     }
 }

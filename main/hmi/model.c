@@ -62,26 +62,27 @@ static void model_set_gain(float g) {
 }
 
 static model_t* get_model() {
-    static model_t _model;
     static model_t* _model_ptr;
     if(!_model_ptr) {
         ESP_LOGI(TAG, "Model just created!");
-        _model_ptr = &_model;
-        _model.interface.set_led_matrix_values = model_set_led_matrix_values;
-        _model.interface.set_left_button_clicked = model_set_left_button_clicked;
-        _model.interface.set_right_button_clicked = model_set_right_button_clicked;
-        _model.interface.set_middle_button_clicked = model_set_middle_button_clicked;
-        _model.interface.set_option_selected = model_set_option_selected;
-        _model.interface.set_gain = model_set_gain;
+        _model_ptr = heap_caps_calloc(1, sizeof(model_t), MALLOC_CAP_SPIRAM);
+        assert(_model_ptr);
+        
+        _model_ptr->interface.set_led_matrix_values = model_set_led_matrix_values;
+        _model_ptr->interface.set_left_button_clicked = model_set_left_button_clicked;
+        _model_ptr->interface.set_right_button_clicked = model_set_right_button_clicked;
+        _model_ptr->interface.set_middle_button_clicked = model_set_middle_button_clicked;
+        _model_ptr->interface.set_option_selected = model_set_option_selected;
+        _model_ptr->interface.set_gain = model_set_gain;
 
-        _model.front_buttons.left_clicked = false;
-        _model.front_buttons.right_clicked = false;
+        _model_ptr->front_buttons.left_clicked = false;
+        _model_ptr->front_buttons.right_clicked = false;
 
-        _model.options_values.gain = 1.0F;
+        _model_ptr->options_values.gain = 1.0F;
 
-        _model.option_selected = OPTION_SELECT_GAIN;
+        _model_ptr->option_selected = OPTION_SELECT_GAIN;
 
-        led_matrix_clear(&_model.led_matrix);
+        led_matrix_clear(&_model_ptr->led_matrix);
     }
     return _model_ptr;
 }

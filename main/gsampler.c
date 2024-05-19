@@ -21,22 +21,36 @@ static RingbufHandle_t ringbuff_handle;
 results_processor_t result_processor;
 static float variable_gain = 1.0F;
 
-__attribute__((aligned(16))) float window_time_domain[RECEIVER_SAMPLES_COUNT];
-__attribute__((aligned(16))) float testsig[RECEIVER_SAMPLES_COUNT];
-__attribute__((aligned(16))) float fft_complex_workspace[FFT_WORKSPACE_BUFFER_SIZE];
+
+// __attribute__((aligned(16))) float window_time_domain[RECEIVER_SAMPLES_COUNT];
+
+// __attribute__((aligned(16))) float testsig[RECEIVER_SAMPLES_COUNT];
+float* testsig;
+
+// __attribute__((aligned(16))) float fft_complex_workspace[FFT_WORKSPACE_BUFFER_SIZE];
+float* fft_complex_workspace;
+
+// __attribute__((aligned(16))) float fft_result[FFT_RESULT_SAMPLES_COUNT];
+float* fft_result;
+
+// __attribute__((aligned(16))) float fft_last_result[FFT_RESULT_SAMPLES_COUNT];
+float* fft_last_result;
+
+// __attribute__((aligned(16))) float fft_result_grad[FFT_RESULT_SAMPLES_COUNT];
+float* fft_result_grad;
+
+// __attribute__((aligned(16))) float fft_bins[FFT_BINS_COUNT];
+float* fft_bins;
+
+// __attribute__((aligned(16))) float fft_last_bins[FFT_BINS_COUNT];
+float* fft_last_bins;
+
+// __attribute__((aligned(16))) float fft_bins_grad[FFT_BINS_COUNT];
+float* fft_bins_grad;
 
 float fft_result_deltatime_sec;
 
-__attribute__((aligned(16))) float fft_result[FFT_RESULT_SAMPLES_COUNT];
-__attribute__((aligned(16))) float fft_last_result[FFT_RESULT_SAMPLES_COUNT];
-__attribute__((aligned(16))) float fft_result_grad[FFT_RESULT_SAMPLES_COUNT];
-
-__attribute__((aligned(16))) float fft_bins[FFT_BINS_COUNT];
-__attribute__((aligned(16))) float fft_last_bins[FFT_BINS_COUNT];
-__attribute__((aligned(16))) float fft_bins_grad[FFT_BINS_COUNT];
-
 static float fft_sum;
-// static float fft_last_sum;
 static float fft_sum_grad;
 
 static bool fft_beat_detected;
@@ -117,14 +131,14 @@ static void fft_process(int16_t samples[RECEIVER_SAMPLES_COUNT], float workspace
     //     workspace[sample_idx] = ((float)samples[sample_idx]) / ((float)INT16_MAX);
     // }
 
-    dsps_wind_hann_f32(window_time_domain, RECEIVER_SAMPLES_COUNT);
+    // dsps_wind_hann_f32(window_time_domain, RECEIVER_SAMPLES_COUNT);
     // dsps_tone_gen_f32(testsig, RECEIVER_SAMPLES_COUNT, 1.0, 0.16,  0);
 
 
     assert(FFT_WORKSPACE_BUFFER_SIZE == (RECEIVER_SAMPLES_COUNT * 2));
     for (int i = 0; i < RECEIVER_SAMPLES_COUNT; i++) {
         testsig[i] = ((float)samples[i]) / 4096.0F;
-        workspace[2 * i + 0] = testsig[i] * window_time_domain[i];
+        workspace[2 * i + 0] = testsig[i];// * window_time_domain[i];
         workspace[2 * i + 1] = 0;
     }
 
@@ -230,7 +244,10 @@ static void gsampler_processor_task(void* params) {
     size_t actual_halfwords_count = 0;
     size_t actual_bytes_count = 0;
 
-    int16_t receiver_buffer[RECEIVER_SAMPLES_COUNT] = {0};
+    // int16_t receiver_buffer[RECEIVER_SAMPLES_COUNT] = {0};
+    int16_t* receiver_buffer = heap_caps_calloc(1, RECEIVER_SAMPLES_COUNT * sizeof(int16_t), MALLOC_CAP_SPIRAM);
+    assert(receiver_buffer);
+
     size_t remaining_halfwords_count = RECEIVER_SAMPLES_COUNT;
     size_t receiver_buffer_idx = 0;
 
@@ -357,6 +374,30 @@ static void gsampler_processor_task(void* params) {
 esp_err_t gsampler_inti(results_processor_t result_proc) {
     esp_err_t ret = ESP_OK;
 
+    testsig = heap_caps_calloc(1, RECEIVER_SAMPLES_COUNT * sizeof(float), MALLOC_CAP_SPIRAM);
+    assert(testsig);
+    
+    fft_complex_workspace = heap_caps_calloc(1, FFT_WORKSPACE_BUFFER_SIZE * sizeof(float), MALLOC_CAP_SPIRAM);
+    assert(fft_complex_workspace);
+
+    fft_result = heap_caps_calloc(1, FFT_RESULT_SAMPLES_COUNT * sizeof(float), MALLOC_CAP_SPIRAM);
+    assert(fft_result);
+    
+    fft_last_result = heap_caps_calloc(1, FFT_RESULT_SAMPLES_COUNT * sizeof(float), MALLOC_CAP_SPIRAM);
+    assert(fft_last_result);
+    
+    fft_result_grad = heap_caps_calloc(1, FFT_RESULT_SAMPLES_COUNT * sizeof(float), MALLOC_CAP_SPIRAM);
+    assert(fft_result_grad);
+
+    fft_bins = heap_caps_calloc(1, FFT_BINS_COUNT * sizeof(float), MALLOC_CAP_SPIRAM);
+    assert(fft_bins);
+
+    fft_last_bins = heap_caps_calloc(1, FFT_BINS_COUNT * sizeof(float), MALLOC_CAP_SPIRAM);
+    assert(fft_last_bins);
+
+    fft_bins_grad = heap_caps_calloc(1, FFT_BINS_COUNT * sizeof(float), MALLOC_CAP_SPIRAM);
+    assert(fft_bins_grad);
+
     result_processor = result_proc;
     assert(result_processor);
 
@@ -366,7 +407,7 @@ esp_err_t gsampler_inti(results_processor_t result_proc) {
     ret = dsps_fft2r_init_fc32(NULL, CONFIG_DSP_MAX_FFT_SIZE);
     ESP_RETURN_ON_ERROR(ret, TAG, "Not possible to initialize FFT.");
 
-    dsps_wind_hann_f32(window_time_domain, RECEIVER_SAMPLES_COUNT);
+    // dsps_wind_hann_f32(window_time_domain, RECEIVER_SAMPLES_COUNT);
 
     const bool processor_task_was_created = xTaskCreate(
         gsampler_processor_task, 

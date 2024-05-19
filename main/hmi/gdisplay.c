@@ -22,6 +22,7 @@
 #include "gdisplay_api.h"
 #include "model.h"
 #include "gfonts.h"
+#include "esp_heap_caps.h"
 
 static const char TAG[] = "GDisplay";
 
@@ -179,6 +180,7 @@ static uint16_t gdisplay_get_display_height() {
 }
 
 //Place data into DRAM. Constant data gets placed into DROM by default, which is not accessible by DMA.
+//ST7789V https://github.com/espressif/esp-box/blob/master/docs/hardware_overview/esp32_s3_box_lite/hardware_overview_for_lite.md
 DRAM_ATTR static const lcd_init_cmd_t st_init_cmds[] = {
     /* Memory Data Access Control, MX=MV=1, MY=ML=MH=0, RGB=0 */
     // {0x36, {0x40 | 0x80}, 1},
