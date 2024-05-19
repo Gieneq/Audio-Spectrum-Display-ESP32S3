@@ -54,7 +54,10 @@ static const char TAG[] = "GDisplay";
 static spi_device_handle_t spi;
 
 // static uint16_t* display_buffer;
-DMA_ATTR static uint16_t display_buffer[DISPLAY_PIXELS_COUNT];
+// DMA_ATTR static uint16_t display_buffer[DISPLAY_PIXELS_COUNT];
+uint16_t* display_buffer;
+
+DMA_ATTR static uint16_t display_chunk[DISPLAY_PIXELS_PER_CHUNK];
 
 static gdisplay_api_t gdisplay_api;
 
@@ -296,12 +299,14 @@ static uint32_t lcd_get_id(spi_device_handle_t spi) {
  * sent faster (compared to calling spi_device_transmit several times), and at
  * the mean while the lines for next transactions can get calculated.
  */
-static void send_lines(spi_device_handle_t spi, int ypos, uint16_t *linedata) {
+static void send_lines(spi_device_handle_t spi, int ypos, const uint16_t* linedata) {
     esp_err_t ret;
     int x;
     //Transaction descriptors. Declared static so they're not allocated on the stack; we need this memory even when this
     //function is finished because the SPI driver needs access to it even while we're already calculating the next line.
     static spi_transaction_t trans[6];
+
+    memcpy(display_chunk, linedata, sizeof(uint16_t) * DISPLAY_PIXELS_PER_CHUNK);
 
     //In theory, it's better to initialize trans and data only once and hang on to the initialized
     //variables. We allocate them on the stack, so we need to re-init them each call.
@@ -483,7 +488,7 @@ static void gdisplay_task(void* params) {
             total_sending_time = 0;
             total_draw_time = 0;
 
-            ESP_LOGV(TAG, "Draw: time=%lums, fps=%.3f, usage=%.1f", draw_time_ms, fps, usage);
+            ESP_LOGI(TAG, "Draw: time=%lums, fps=%.3f, usage=%.1f", draw_time_ms, fps, usage);
             measure_counter = 0;
             
             start_measurement_time = esp_timer_get_time();
@@ -495,8 +500,12 @@ static void gdisplay_task(void* params) {
 esp_err_t gdisplay_lcd_init(void) {
     ESP_LOGI(TAG, "GDisplay initializing...");
 
-    ESP_LOGI(TAG, "Attempt to allocate DMA MEM %u B... Available=%u B.", 
-        DISPLAY_PIXELS_COUNT * sizeof(uint16_t), heap_caps_get_free_size(MALLOC_CAP_DMA));
+
+    display_buffer = heap_caps_calloc(1, DISPLAY_PIXELS_COUNT * sizeof(uint16_t), MALLOC_CAP_SPIRAM);
+    assert(display_buffer);
+
+    // ESP_LOGI(TAG, "Attempt to allocate DMA MEM %u B... Available=%u B.", 
+    //     DISPLAY_PIXELS_COUNT * sizeof(uint16_t), heap_caps_get_free_size(MALLOC_CAP_DMA));
     // display_buffer = heap_caps_malloc(DISPLAY_PIXELS_COUNT * sizeof(uint16_t), MALLOC_CAP_DMA);
     // assert(display_buffer);
 
