@@ -261,13 +261,14 @@ esp_err_t ws2812b_grid_init() {
     
     ESP_LOGI(TAG, "Initial draw done! Timings[us]: aquire=%lld, draw:%lld, init_transfer:%lld, duration:%lld, release:%lld", t2-t1, t3-t2, t4-t3, t5-t4, t6-t5);
 
-    const bool ws2812b_grid_was_created = xTaskCreate(
+    const bool ws2812b_grid_was_created = xTaskCreatePinnedToCore(
         ws2812b_grid_task, 
         "ws2812b_grid_task", 
         1024 * 4, 
         NULL, 
         20, 
-        NULL
+        NULL,
+        1
     ) == pdTRUE;
     ESP_RETURN_ON_FALSE(ws2812b_grid_was_created, ESP_FAIL, TAG, "Failed creating \'ws2812b_grid_task\'!");
 

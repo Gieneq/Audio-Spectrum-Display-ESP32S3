@@ -409,23 +409,25 @@ esp_err_t gsampler_inti(results_processor_t result_proc) {
 
     // dsps_wind_hann_f32(window_time_domain, RECEIVER_SAMPLES_COUNT);
 
-    const bool processor_task_was_created = xTaskCreate(
+    const bool processor_task_was_created = xTaskCreatePinnedToCore(
         gsampler_processor_task, 
         "gsampler_processor_task", 
         1024 * 8, 
         NULL, 
         10, 
-        NULL
+        NULL,
+        1
     ) == pdTRUE;
     ESP_RETURN_ON_FALSE(processor_task_was_created, ESP_FAIL, TAG, "Failed creating \'gsampler_processor_task\'!");
     
-    const bool mic_sampler_task_was_created = xTaskCreate(
+    const bool mic_sampler_task_was_created = xTaskCreatePinnedToCore(
         mic_sampler_task, 
         "mic_sampler_task", 
         1024 * 16, 
         NULL, 
         5, 
-        NULL
+        NULL,
+        0
     ) == pdTRUE;
     ESP_RETURN_ON_FALSE(mic_sampler_task_was_created, ESP_FAIL, TAG, "Failed creating \'mic_sampler_task\'!");
 

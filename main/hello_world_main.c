@@ -471,7 +471,7 @@ void app_main(void) {
     ret = iot_button_register_cb(front_buttons[ADC_BUTTON_RIGHT], BUTTON_PRESS_UP, button_right_released_callback, NULL);
     ESP_ERROR_CHECK(ret);
 
-    ESP_LOGI(TAG, "MEM available: Any=%u B, DMA=%u B, SPI=%u B.", 
+    ESP_LOGV(TAG, "MEM available: Any=%u B, DMA=%u B, SPI=%u B.", 
         heap_caps_get_free_size(MALLOC_CAP_8BIT),
         heap_caps_get_free_size(MALLOC_CAP_DMA),
         heap_caps_get_free_size(MALLOC_CAP_SPIRAM)
@@ -482,7 +482,7 @@ void app_main(void) {
 
     while(1) {
         vTaskDelay(100);
-        ESP_LOGI(TAG, "MEM available: Any=%u B, DMA=%u B, SPI=%u B.", 
+        ESP_LOGV(TAG, "MEM available: Any=%u B, DMA=%u B, SPI=%u B.", 
             heap_caps_get_free_size(MALLOC_CAP_8BIT),
             heap_caps_get_free_size(MALLOC_CAP_DMA),
             heap_caps_get_free_size(MALLOC_CAP_SPIRAM)

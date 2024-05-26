@@ -67,25 +67,25 @@ typedef struct {
     uint8_t databytes; //No of data in data; bit 7 = delay after set; 0xFF = end of cmds.
 } lcd_init_cmd_t;
 
-static void lcd_data(spi_device_handle_t spi, const uint8_t *data, int len);
+// static void IRAM_ATTR lcd_data(spi_device_handle_t spi, const uint8_t *data, int len);
 
-static void lcd_cmd(spi_device_handle_t spi, const uint8_t cmd, bool keep_cs_active);
+// static void IRAM_ATTR lcd_cmd(spi_device_handle_t spi, const uint8_t cmd, bool keep_cs_active);
 
-static void lcd_spi_pre_transfer_callback(spi_transaction_t *t);
+// static void IRAM_ATTR lcd_spi_pre_transfer_callback(spi_transaction_t *t);
 
-static uint32_t lcd_get_id(spi_device_handle_t spi);
+// static uint32_t IRAM_ATTR  lcd_get_id(spi_device_handle_t spi);
 
 static void gdisplay_task(void* params);
 
 /* Tools */
 
-static void gdisplay_draw_pixel(uint16_t x, uint16_t y, uint16_t color) {
+static void IRAM_ATTR gdisplay_draw_pixel(uint16_t x, uint16_t y, uint16_t color) {
     assert(x < DISPLAY_WIDTH);
     assert(y < DISPLAY_HEIGHT);
     display_buffer[x + DISPLAY_WIDTH * y] = color;
 }
 
-static void gdisplay_draw_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color) {
+static void IRAM_ATTR gdisplay_draw_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color) {
     for (uint16_t iy = 0; iy < h; iy++) {
         for (uint16_t ix = 0; ix < w; ix++) {
             display_buffer[(x + ix) + DISPLAY_WIDTH * (y + iy)] = color;
@@ -93,7 +93,7 @@ static void gdisplay_draw_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, u
     }
 }
 
-static void gdisplay_draw_text(uint16_t x, uint16_t y, const gfont_t* font, const char* text) {
+static void IRAM_ATTR gdisplay_draw_text(uint16_t x, uint16_t y, const gfont_t* font, const char* text) {
     const size_t chars_count = strlen(text);
     if (chars_count == 0) {
         return;
@@ -133,7 +133,7 @@ static void gdisplay_draw_text(uint16_t x, uint16_t y, const gfont_t* font, cons
     }
 }
 
-static void gdisplay_draw_bytes_bitmap(uint16_t x, uint16_t y, uint16_t w, const uint8_t* bytes, const uint16_t bytes_count) {
+static void IRAM_ATTR gdisplay_draw_bytes_bitmap(uint16_t x, uint16_t y, uint16_t w, const uint8_t* bytes, const uint16_t bytes_count) {
     assert(bytes);
     const uint16_t pixels_count = bytes_count / 2;
     const uint16_t h = pixels_count / w;
@@ -164,21 +164,21 @@ static void gdisplay_draw_bytes_bitmap(uint16_t x, uint16_t y, uint16_t w, const
     
 }
 
-static void gdisplay_fill_black() {
+static void IRAM_ATTR gdisplay_fill_black() {
     memset(display_buffer, 0, DISPLAY_PIXELS_COUNT * sizeof(uint16_t));
 }
 
-static void gdisplay_fill_color(uint16_t color) {
+static void IRAM_ATTR gdisplay_fill_color(uint16_t color) {
     for(uint32_t pixel_idx = 0; pixel_idx < DISPLAY_PIXELS_COUNT; ++pixel_idx) {
         display_buffer[pixel_idx] = color;
     }
 }
 
-static uint16_t gdisplay_get_display_width() {
+static uint16_t IRAM_ATTR gdisplay_get_display_width() {
     return DISPLAY_WIDTH;
 }
 
-static uint16_t gdisplay_get_display_height() {
+static uint16_t IRAM_ATTR gdisplay_get_display_height() {
     return DISPLAY_HEIGHT;
 }
 
@@ -228,7 +228,7 @@ DRAM_ATTR static const lcd_init_cmd_t st_init_cmds[] = {
  * mode for higher speed. The overhead of interrupt transactions is more than
  * just waiting for the transaction to complete.
  */
-static void lcd_cmd(spi_device_handle_t spi, const uint8_t cmd, bool keep_cs_active) {
+static void IRAM_ATTR lcd_cmd(spi_device_handle_t spi, const uint8_t cmd, bool keep_cs_active) {
     esp_err_t ret;
     spi_transaction_t t;
     memset(&t, 0, sizeof(t));       //Zero out the transaction
@@ -249,7 +249,7 @@ static void lcd_cmd(spi_device_handle_t spi, const uint8_t cmd, bool keep_cs_act
  * mode for higher speed. The overhead of interrupt transactions is more than
  * just waiting for the transaction to complete.
  */
-static void lcd_data(spi_device_handle_t spi, const uint8_t *data, int len) {
+static void IRAM_ATTR lcd_data(spi_device_handle_t spi, const uint8_t *data, int len) {
     esp_err_t ret;
     spi_transaction_t t;
     if (len == 0) {
@@ -265,12 +265,12 @@ static void lcd_data(spi_device_handle_t spi, const uint8_t *data, int len) {
 
 //This function is called (in irq context!) just before a transmission starts. It will
 //set the D/C line to the value indicated in the user field.
-static void lcd_spi_pre_transfer_callback(spi_transaction_t *t) {
+static void IRAM_ATTR lcd_spi_pre_transfer_callback(spi_transaction_t *t) {
     int dc = (int)t->user;
     gpio_set_level(PIN_NUM_DC, dc);
 }
 
-static uint32_t lcd_get_id(spi_device_handle_t spi) {
+static uint32_t IRAM_ATTR lcd_get_id(spi_device_handle_t spi) {
     // When using SPI_TRANS_CS_KEEP_ACTIVE, bus must be locked/acquired
     spi_device_acquire_bus(spi, portMAX_DELAY);
 
@@ -488,7 +488,7 @@ static void gdisplay_task(void* params) {
             total_sending_time = 0;
             total_draw_time = 0;
 
-            ESP_LOGI(TAG, "Draw: time=%lums, fps=%.3f, usage=%.1f", draw_time_ms, fps, usage);
+            ESP_LOGV(TAG, "Draw: time=%lums, fps=%.3f, usage=%.1f", draw_time_ms, fps, usage);
             measure_counter = 0;
             
             start_measurement_time = esp_timer_get_time();
@@ -546,13 +546,16 @@ esp_err_t gdisplay_lcd_init(void) {
     //Initialize the LCD
     lcd_init(spi);
 
-    const bool display_task_was_created = xTaskCreate(
+    
+
+    const bool display_task_was_created = xTaskCreatePinnedToCore(
         gdisplay_task, 
         "gdisplay_task", 
         1024 * 8, 
         NULL, 
         20, 
-        NULL
+        NULL,
+        1
     ) == pdTRUE;
     ESP_RETURN_ON_FALSE(display_task_was_created, ESP_FAIL, TAG, "Failed creating \'display_task\'!");
 
