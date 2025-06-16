@@ -9,7 +9,7 @@ extern "C" {
 #include "freertos/FreeRTOS.h"
 #include "esp_err.h"
 
-#include "../led_matrix.h"
+#include "../leds/led_matrix.h"
 #include "gdisplay_api.h"
 #include "../gtypes.h"
 

@@ -11,7 +11,7 @@
     "idf.openOcdConfigs": [
         "board/esp32s3-bridge.cfg"
     ],
-    "idf.portWin": "COM6",
+    "idf.portWin": "COM5",
     "idf.pythonBinPathWin": "C:/Espressif/python_env/idf5.1_py3.11_env/Scripts/python.exe",
     "idf.toolsPathWin": "C:\\Espressif",
     "idf.flashType": "UART",
@@ -63,6 +63,9 @@
         "bt_app_av.h": "c",
         "nvs.h": "c",
         "nvs_flash.h": "c",
-        "sockets.h": "c"
+        "sockets.h": "c",
+        "ranges": "c",
+        "span": "c",
+        "asd_packet.h": "c"
     }
 }

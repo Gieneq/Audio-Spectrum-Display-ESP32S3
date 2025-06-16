@@ -1,4 +1,5 @@
 #include "gsampler.h"
+#include <string.h>
 
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
