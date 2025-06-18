@@ -66,6 +66,13 @@
         "sockets.h": "c",
         "ranges": "c",
         "span": "c",
-        "asd_packet.h": "c"
+        "asd_packet.h": "c",
+        "stdlib.h": "c",
+        "time.h": "c",
+        "esp_now.h": "c",
+        "esp_mac.h": "c",
+        "esp_random.h": "c",
+        "effects.h": "c",
+        "sources.h": "c"
     }
 }

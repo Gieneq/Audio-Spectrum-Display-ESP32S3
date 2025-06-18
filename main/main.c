@@ -26,6 +26,7 @@
 
 #include "rf/rf_sender.h"
 #include "rf/asd_packet.h"
+#include "effects/effects.h"
 
 static const char TAG[] = "Main";
 
@@ -443,7 +444,9 @@ void app_main(void) {
 
     led_matrix_init(led_matrix);
     led_matrix_clear(led_matrix);
-    // init_effect();
+    
+    ret = effects_init();
+    ESP_ERROR_CHECK(ret);
     
     asd_packet_builder_t* asd_packet_builder = heap_caps_calloc(1, sizeof(asd_packet_builder_t ), MALLOC_CAP_SPIRAM);
     asd_packet_builder_init(asd_packet_builder);
@@ -504,12 +507,7 @@ void app_main(void) {
     vTaskDelay(pdMS_TO_TICKS(1000));
    
     while(1) {
-        led_matrix_clear(led_matrix);
-        for (uint8_t i = 0; i < 7; ++i) {
-            led_matrix_access_pixel_at(led_matrix, column_idx, 0 * 7 + i)->red = 255 - (i * 36);
-            led_matrix_access_pixel_at(led_matrix, column_idx, 1 * 7 + i)->green = 255 - (i * 36);
-            led_matrix_access_pixel_at(led_matrix, column_idx, 2 * 7 + i)->blue = 255 - (i * 36);
-        }
+        effects_draw_to_led_matrix(led_matrix);
 
         model_interface_t* model_if = NULL;
         if (model_interface_access(&model_if, portMAX_DELAY)) {

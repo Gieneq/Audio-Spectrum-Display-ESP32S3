@@ -1,0 +1,41 @@
+#include "sources.h"
+#include <stdlib.h>
+#include <time.h>
+#include <string.h>
+#include <assert.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+#include "freertos/timers.h"
+#include "nvs_flash.h"
+#include "esp_random.h"
+#include "esp_event.h"
+#include "esp_netif.h"
+#include "esp_wifi.h"
+#include "esp_log.h"
+#include "esp_mac.h"
+#include "esp_now.h"
+#include "esp_crc.h"
+
+static const char *TAG = "SOURCE_SIMULATION";
+
+static sources_sample_data_t data;
+
+static void sources_simulation_task(void *pvParameter) {
+    ESP_LOGI(TAG, "Start task");
+    while(1) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
+esp_err_t sources_simulation_init() {
+    
+    xTaskCreate(sources_simulation_task, "sources_simulation_task", 3 * 1024, NULL, 4, NULL);
+    
+    return ESP_OK;
+}
+
+const sources_sample_data_t* sources_simulation_await_sample_data(TickType_t timeout_tick_time) {
+    // TODO
+    vTaskDelay(pdMS_TO_TICKS(10));
+    return &data;
+}
