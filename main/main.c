@@ -29,6 +29,8 @@
 
 static const char TAG[] = "Main";
 
+static uint16_t column_idx = 0;
+
 // static float heights[LED_MATRIX_COLUMNS];
 // static float velocities[LED_MATRIX_COLUMNS];
 
@@ -272,19 +274,19 @@ static button_handle_t front_buttons[BUTTONS_COUNT];
 static void button_side_released_callback(void *arg, void *data) {
     (void)arg;
     (void)data;
-    ESP_LOGI(TAG, "Side button released");
+    ESP_LOGV(TAG, "Side button released");
 }
 
 static void button_side_longpressed_callback(void *arg, void *data) {
     (void)arg;
     (void)data;
-    ESP_LOGI(TAG, "Side button longpressed");
+    ESP_LOGV(TAG, "Side button longpressed");
 }
 
 static void button_left_pressed_callback(void *arg, void *data) {
     (void)arg;
     (void)data;
-    ESP_LOGI(TAG, "Left button pressed");
+    ESP_LOGV(TAG, "Left button pressed");
     model_interface_t* model_if = NULL;
     if (model_interface_access(&model_if, portMAX_DELAY)) {
         model_if->set_left_button_clicked(true);
@@ -295,7 +297,14 @@ static void button_left_pressed_callback(void *arg, void *data) {
 static void button_left_released_callback(void *arg, void *data) {
     (void)arg;
     (void)data;
-    ESP_LOGI(TAG, "Left button released");
+    ESP_LOGV(TAG, "Left button released");
+
+    if (column_idx == 0) {
+        column_idx = LED_MATRIX_COLUMNS - 1;
+    } else {
+        column_idx -= 1;
+    }
+
     model_interface_t* model_if = NULL;
     if (model_interface_access(&model_if, portMAX_DELAY)) {
         model_if->set_left_button_clicked(false);
@@ -324,7 +333,7 @@ static void button_left_released_callback(void *arg, void *data) {
 static void button_middle_released_callback(void *arg, void *data) {
     (void)arg;
     (void)data;
-    ESP_LOGI(TAG, "Middle button released");
+    ESP_LOGV(TAG, "Middle button released");
     model_interface_t* model_if = NULL;
     if (model_interface_access(&model_if, portMAX_DELAY)) {
         model_if->set_middle_button_clicked(true);
@@ -341,7 +350,7 @@ static void button_middle_released_callback(void *arg, void *data) {
 static void button_right_pressed_callback(void *arg, void *data) {
     (void)arg;
     (void)data;
-    ESP_LOGI(TAG, "Right button pressed");
+    ESP_LOGV(TAG, "Right button pressed");
     model_interface_t* model_if = NULL;
     if (model_interface_access(&model_if, portMAX_DELAY)) {
         model_if->set_right_button_clicked(true);
@@ -352,7 +361,11 @@ static void button_right_pressed_callback(void *arg, void *data) {
 static void button_right_released_callback(void *arg, void *data) {
     (void)arg;
     (void)data;
-    ESP_LOGI(TAG, "Right button released");
+    ESP_LOGV(TAG, "Right button released");
+    
+    column_idx += 1;
+    column_idx %= LED_MATRIX_COLUMNS;
+
     model_interface_t* model_if = NULL;
     if (model_interface_access(&model_if, portMAX_DELAY)) {
         model_if->set_right_button_clicked(false);
@@ -489,16 +502,14 @@ void app_main(void) {
     );
    
     vTaskDelay(pdMS_TO_TICKS(1000));
-
-    uint16_t column_idx = 0;
    
     while(1) {
         led_matrix_clear(led_matrix);
-        column_idx += 1;
-        column_idx %= LED_MATRIX_COLUMNS;
-        led_matrix_access_pixel_at(led_matrix, column_idx, 0)->red = 255;
-        led_matrix_access_pixel_at(led_matrix, column_idx, 1)->green = 255;
-        led_matrix_access_pixel_at(led_matrix, column_idx, 2)->blue = 255;
+        for (uint8_t i = 0; i < 7; ++i) {
+            led_matrix_access_pixel_at(led_matrix, column_idx, 0 * 7 + i)->red = 255 - (i * 36);
+            led_matrix_access_pixel_at(led_matrix, column_idx, 1 * 7 + i)->green = 255 - (i * 36);
+            led_matrix_access_pixel_at(led_matrix, column_idx, 2 * 7 + i)->blue = 255 - (i * 36);
+        }
 
         model_interface_t* model_if = NULL;
         if (model_interface_access(&model_if, portMAX_DELAY)) {
@@ -511,7 +522,7 @@ void app_main(void) {
             ESP_LOGE(TAG, "rf_sender_send_led_matrix failed");
         }
 
-        vTaskDelay(pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(20));
         ESP_LOGV(TAG, "MEM available: Any=%u B, DMA=%u B, SPI=%u B.", 
             heap_caps_get_free_size(MALLOC_CAP_8BIT),
             heap_caps_get_free_size(MALLOC_CAP_DMA),

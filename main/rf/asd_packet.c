@@ -37,7 +37,7 @@ esp_err_t asd_packet_build_from_leds_matrix(asd_packet_builder_t* apb, const led
     const uint8_t* data_bytes = (const uint8_t*)led_matrix;
     const uint32_t data_size = sizeof(led_matrix_t);
 
-    ESP_LOGI(TAG, "Building ASD packets: data_size=%lu, packets_count=%u", data_size, ASD_LED_MATRIX_PACKETS_COUNT);
+    ESP_LOGV(TAG, "Building ASD packets: data_size=%lu, packets_count=%u", data_size, ASD_LED_MATRIX_PACKETS_COUNT);
 
     uint32_t data_offset = 0;
     uint32_t remaining_data = data_size;
@@ -55,7 +55,7 @@ esp_err_t asd_packet_build_from_leds_matrix(asd_packet_builder_t* apb, const led
         recent_packet->transfer_idx = apb->next_trasfer_idx;
         recent_packet->timestamp_micros = (uint32_t)esp_timer_get_time(); // I wonder what it will bring
         recent_packet->crc = calculate_crc(data_bytes + data_offset, packet_data_size);
-        ESP_LOGI(TAG, "Building ASD packet: packet_idx=%lu, data_offset=%lu, packet_data_size=%lu", 
+        ESP_LOGV(TAG, "Building ASD packet: packet_idx=%lu, data_offset=%lu, packet_data_size=%lu", 
             packet_idx, data_offset, packet_data_size
         );
 
@@ -64,6 +64,6 @@ esp_err_t asd_packet_build_from_leds_matrix(asd_packet_builder_t* apb, const led
     }
 
     apb->next_trasfer_idx++;
-    ESP_LOGI(TAG, "Building done!");
+    ESP_LOGV(TAG, "Building done!");
     return ESP_OK;
 }

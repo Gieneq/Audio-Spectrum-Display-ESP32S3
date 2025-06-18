@@ -37,7 +37,7 @@ static void example_wifi_init(void) {
 }
 
 static void example_espnow_send_cb(const uint8_t *mac_addr, esp_now_send_status_t status) {
-    ESP_LOGI(TAG, "Send callback: status = %d", status);
+    ESP_LOGV(TAG, "Send callback: status = %d", status);
     // Send the status to the queue
     if (xQueueOverwrite(s_espnow_send_status_queue, &status) != pdTRUE) {
         ESP_LOGW(TAG, "Send feedback event was not consumed by sender task!");
@@ -50,7 +50,7 @@ static void example_espnow_recv_cb(const esp_now_recv_info_t *recv_info, const u
 
 static void example_espnow_task(void *pvParameter) {
     vTaskDelay(pdMS_TO_TICKS(1000));
-    ESP_LOGI(TAG, "Start sending data");
+    ESP_LOGV(TAG, "Start sending data");
 
     asd_packet_t packet_to_be_sent = {0};
     esp_now_send_status_t send_status;
@@ -58,7 +58,7 @@ static void example_espnow_task(void *pvParameter) {
 
     while(1) {
         while (xQueueReceive(s_example_espnow_queue, &packet_to_be_sent, portMAX_DELAY) == pdTRUE) {
-            ESP_LOGI(TAG, "s_example_espnow_queue transfer=%lu, packet=%u/%u", 
+            ESP_LOGV(TAG, "s_example_espnow_queue transfer=%lu, packet=%u/%u", 
                 packet_to_be_sent.transfer_idx, 
                 packet_to_be_sent.packet_idx, 
                 packet_to_be_sent.total_packets_count
@@ -66,7 +66,7 @@ static void example_espnow_task(void *pvParameter) {
 
             int retry_count = 0;
             do {
-                ESP_LOGI(TAG, "esp_now_send: packet_idx=%lu, data_offset=%u, packet_data_size=%u",
+                ESP_LOGV(TAG, "esp_now_send: packet_idx=%lu, data_offset=%u, packet_data_size=%u",
                     packet_to_be_sent.transfer_idx,
                     packet_to_be_sent.packet_idx,
                     packet_to_be_sent.total_packets_count
@@ -84,7 +84,7 @@ static void example_espnow_task(void *pvParameter) {
                 // Wait for send callback to return result
                 if (xQueueReceive(s_espnow_send_status_queue, &send_status, pdMS_TO_TICKS(1000)) == pdTRUE) {
                     if (send_status == ESP_NOW_SEND_SUCCESS) {
-                        ESP_LOGI(TAG, "Send successful");
+                        ESP_LOGV(TAG, "Send successful");
                         break; // exit retry loop
                     } else {
                         ESP_LOGW(TAG, "Send failed, retrying...");
