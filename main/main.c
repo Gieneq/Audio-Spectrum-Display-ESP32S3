@@ -285,20 +285,20 @@ static void button_left_pressed_callback(void *arg, void *data) {
     (void)arg;
     (void)data;
     ESP_LOGI(TAG, "Left button pressed");
-//     model_interface_t* model_if = NULL;
-//     if (model_interface_access(&model_if, portMAX_DELAY)) {
-//         model_if->set_left_button_clicked(true);
-//         model_interface_release();
-//     }
+    model_interface_t* model_if = NULL;
+    if (model_interface_access(&model_if, portMAX_DELAY)) {
+        model_if->set_left_button_clicked(true);
+        model_interface_release();
+    }
 }
 
 static void button_left_released_callback(void *arg, void *data) {
     (void)arg;
     (void)data;
     ESP_LOGI(TAG, "Left button released");
-//     model_interface_t* model_if = NULL;
-//     if (model_interface_access(&model_if, portMAX_DELAY)) {
-//         model_if->set_left_button_clicked(false);
+    model_interface_t* model_if = NULL;
+    if (model_interface_access(&model_if, portMAX_DELAY)) {
+        model_if->set_left_button_clicked(false);
 
 //         switch (recent_option_selected) {
 //         case OPTION_SELECT_GAIN:
@@ -317,45 +317,45 @@ static void button_left_released_callback(void *arg, void *data) {
 //             break;
         // }
 
-//         model_interface_release();
-//     }
+        model_interface_release();
+    }
 }
 
 static void button_middle_released_callback(void *arg, void *data) {
     (void)arg;
     (void)data;
     ESP_LOGI(TAG, "Middle button released");
-//     model_interface_t* model_if = NULL;
-//     if (model_interface_access(&model_if, portMAX_DELAY)) {
-//         model_if->set_middle_button_clicked(true);
+    model_interface_t* model_if = NULL;
+    if (model_interface_access(&model_if, portMAX_DELAY)) {
+        model_if->set_middle_button_clicked(true);
 
 //         int next_option_index = recent_option_selected + 1;
 //         next_option_index %= OPTION_SELECT_COUNT;
 //         recent_option_selected = next_option_index;
 //         model_if->set_option_selected((option_select_t)next_option_index);
 
-//         model_interface_release();
-//     }
+        model_interface_release();
+    }
 }
 
 static void button_right_pressed_callback(void *arg, void *data) {
     (void)arg;
     (void)data;
     ESP_LOGI(TAG, "Right button pressed");
-//     model_interface_t* model_if = NULL;
-//     if (model_interface_access(&model_if, portMAX_DELAY)) {
-//         model_if->set_right_button_clicked(true);
-//         model_interface_release();
-//     }
+    model_interface_t* model_if = NULL;
+    if (model_interface_access(&model_if, portMAX_DELAY)) {
+        model_if->set_right_button_clicked(true);
+        model_interface_release();
+    }
 }
 
 static void button_right_released_callback(void *arg, void *data) {
     (void)arg;
     (void)data;
     ESP_LOGI(TAG, "Right button released");
-//     model_interface_t* model_if = NULL;
-//     if (model_interface_access(&model_if, portMAX_DELAY)) {
-//         model_if->set_right_button_clicked(false);
+    model_interface_t* model_if = NULL;
+    if (model_interface_access(&model_if, portMAX_DELAY)) {
+        model_if->set_right_button_clicked(false);
 
 //         switch (recent_option_selected) {
 //         case OPTION_SELECT_GAIN:
@@ -374,8 +374,8 @@ static void button_right_released_callback(void *arg, void *data) {
 //             break;
 //         }
 
-//         model_interface_release();
-//     }
+        model_interface_release();
+    }
 }
 
 
@@ -489,8 +489,23 @@ void app_main(void) {
     );
    
     vTaskDelay(pdMS_TO_TICKS(1000));
+
+    uint16_t column_idx = 0;
    
     while(1) {
+        led_matrix_clear(led_matrix);
+        column_idx += 1;
+        column_idx %= LED_MATRIX_COLUMNS;
+        led_matrix_access_pixel_at(led_matrix, column_idx, 0)->red = 255;
+        led_matrix_access_pixel_at(led_matrix, column_idx, 1)->green = 255;
+        led_matrix_access_pixel_at(led_matrix, column_idx, 2)->blue = 255;
+
+        model_interface_t* model_if = NULL;
+        if (model_interface_access(&model_if, portMAX_DELAY)) {
+            model_if->set_led_matrix_values(led_matrix);
+            model_interface_release();
+        }
+
         ret = rf_sender_send_led_matrix(asd_packet_builder, led_matrix);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "rf_sender_send_led_matrix failed");
