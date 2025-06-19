@@ -33,9 +33,13 @@ static float fft_magnitude[FFT_RESULT_SIZE] __attribute__((aligned(16)));
 
 static float window[FFT_SIZE]  __attribute__((aligned(16)));
 
+// Simulation
 extern esp_err_t source_simulation_init();
-
 extern const input_samples_window_t* source_simulation_await_input_samples_window(TickType_t timeout_tick_time);
+
+// Microphones
+extern esp_err_t source_microphones_init();
+extern const input_samples_window_t* source_microphones_await_input_samples_window(TickType_t timeout_tick_time);
 
 static processed_input_result_t processed_input_result;
 
@@ -62,6 +66,11 @@ esp_err_t sources_init_all() {
     dsps_wind_hann_f32(window, FFT_SIZE);
 
     ret = source_simulation_init();
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    ret = source_microphones_init();
     if (ret != ESP_OK) {
         return ret;
     }
@@ -139,8 +148,6 @@ static esp_err_t process_input_samples_window(const input_samples_window_t* inpu
 }
 
 const processed_input_result_t* sources_await_processed_input_result(effects_source_t source, TickType_t timeout_tick_time) {
-    // TODO here probably I capture only samples and calculate fft
-
     const input_samples_window_t* input_samples_window = NULL;
 
     switch (source) {
@@ -149,9 +156,8 @@ const processed_input_result_t* sources_await_processed_input_result(effects_sou
         break;
 
     case EFFECTS_SOURCE_MICROPHONE:
-        ESP_LOGW(TAG, "Not implemented");
-        input_samples_window = NULL;
-        break; // TODO
+        input_samples_window = source_microphones_await_input_samples_window(timeout_tick_time);
+        break;
 
     case EFFECTS_SOURCE_WIRED:
         ESP_LOGW(TAG, "Not implemented");
@@ -161,12 +167,11 @@ const processed_input_result_t* sources_await_processed_input_result(effects_sou
     default:
         ESP_LOGW(TAG, "Not implemented");
         input_samples_window = NULL;
-        break; // TODO
+        break;
     }
 
     if (input_samples_window != NULL) {
         process_input_samples_window(input_samples_window, &processed_input_result);
-
         return &processed_input_result;
     }
 

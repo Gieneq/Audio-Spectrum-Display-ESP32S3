@@ -14,7 +14,8 @@ typedef enum effects_source_t {
 
 #define SAMPLES_READY_BIT BIT0
 
-#define SAMPLING_RATE_FHZ 44100.0F
+#define SAMPLING_RATE_HZ    44100U
+#define SAMPLING_RATE_FHZ   44100.0F
 
 #define INPUT_SAMPLES_COUNT 2048
 
