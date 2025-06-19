@@ -17,11 +17,11 @@
 #include "esp_now.h"
 #include "esp_crc.h"
 
-#include "source/sources.h"
+#include "../source/sources.h"
 
 #define EFFECTS_DATA_PROCESSED_BIT BIT0
 
-extern void effect_simple(led_matrix_t* led_matrix, const sources_sample_data_t* data);
+extern void effect_simple(led_matrix_t* led_matrix, const processed_input_result_t* processed_input_result);
 
 static const char *TAG = "EFFECTS";
 
@@ -35,18 +35,31 @@ static void effects_task(void *params) {
 
     effects_source_t recent_source = EFFECTS_SOURCE_SIMULATION;
     effects_type_t recent_effect = EFFECTS_TYPE_SIMPLE;
+    effects_cmd_t received_cmd;
 
     while(1) {
         // Poll cmds from control queue
-        // TODO
-
+        while (xQueueReceive(effects_cmds_queue, &received_cmd, 0) == pdTRUE) {
+            switch (received_cmd.type) {
+                case EFFECTS_CMD_SET_GAIN:
+                    sources_set_gain(received_cmd.data.gain);
+                    break;
+                case EFFECTS_CMD_SET_EFFECT:
+                    recent_effect = received_cmd.data.effects_type;
+                    break;
+                case EFFECTS_CMD_SET_SOURCE:
+                    recent_source = received_cmd.data.effects_source;
+                    break;
+            }
+        }
+        
         // Await samples with some timeout in case of bad source and control signal incomming
-        const sources_sample_data_t* data = sources_await_sample_data(recent_source, pdMS_TO_TICKS(100));
+        const processed_input_result_t* processed_input_result = sources_await_processed_input_result(recent_source, pdMS_TO_TICKS(100));
 
         // Apply effect
         switch (recent_effect) {
         case EFFECTS_TYPE_SIMPLE:
-            effect_simple(&workspace_led_matrix, data);
+            effect_simple(&workspace_led_matrix, processed_input_result);
             break;
         
         default:
@@ -71,17 +84,26 @@ esp_err_t effects_init() {
         return ESP_FAIL;
     }
 
-    xTaskCreate(effects_task, "effects_task", 5 * 1024, NULL, 4, NULL);
-
     esp_err_t ret = sources_init_all();
     if (ret != ESP_OK) {
         return ret;
     }
 
+    xTaskCreate(effects_task, "effects_task", 5 * 1024, NULL, 4, NULL);
+
     return ESP_OK;
 }
 
 esp_err_t effects_send_cmd(effects_cmd_t cmd) {
+    if (effects_cmds_queue == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (xQueueSend(effects_cmds_queue, &cmd, pdMS_TO_TICKS(500)) != pdTRUE) {
+        ESP_LOGW(TAG, "Command queue full, dropping command");
+        return ESP_ERR_TIMEOUT;
+    }
+
     return ESP_OK;
 }
 

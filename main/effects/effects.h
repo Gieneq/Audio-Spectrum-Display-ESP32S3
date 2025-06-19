@@ -6,7 +6,7 @@ extern "C" {
 
 #include <stdint.h>
 #include "esp_err.h"
-#include "source/sources_types.h"
+#include "../source/sources_types.h"
 #include "../leds/led_matrix.h"
 #include "freertos/FreeRTOS.h"
 
@@ -23,6 +23,7 @@ typedef enum effects_cmd_type_t {
     EFFECTS_CMD_SET_EFFECT, // payload: Fire, Electric, Simple ...
 } effects_cmd_type_t;
 
+// Effect idea: fireplace animation with speed/intensity varied by dynamics of input
 typedef enum effects_type_t {
     EFFECTS_TYPE_SIMPLE,
     EFFECTS_TYPE_FIRE,

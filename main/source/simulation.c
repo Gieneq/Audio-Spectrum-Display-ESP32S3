@@ -18,24 +18,24 @@
 
 static const char *TAG = "SOURCE_SIMULATION";
 
-static sources_sample_data_t data;
+static input_samples_window_t input_samples_window;
 
-static void sources_simulation_task(void *pvParameter) {
+static void source_simulation_task(void *pvParameter) {
     ESP_LOGI(TAG, "Start task");
     while(1) {
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 
-esp_err_t sources_simulation_init() {
+esp_err_t source_simulation_init() {
     
-    xTaskCreate(sources_simulation_task, "sources_simulation_task", 3 * 1024, NULL, 4, NULL);
+    xTaskCreate(source_simulation_task, "source_simulation_task", 3 * 1024, NULL, 4, NULL);
     
     return ESP_OK;
 }
 
-const sources_sample_data_t* sources_simulation_await_sample_data(TickType_t timeout_tick_time) {
+const input_samples_window_t* source_simulation_await_input_samples_window(TickType_t timeout_tick_time) {
     // TODO
     vTaskDelay(pdMS_TO_TICKS(10));
-    return &data;
+    return &input_samples_window;
 }

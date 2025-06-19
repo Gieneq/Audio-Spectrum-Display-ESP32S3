@@ -16,13 +16,15 @@ extern "C" {
 
 #define BINS_COUNT 21
 
-typedef struct sources_sample_data_t {
+typedef struct processed_input_result_t {
     float bins[BINS_COUNT];
-} sources_sample_data_t;
+} processed_input_result_t;
 
 esp_err_t sources_init_all();
 
-const sources_sample_data_t* sources_await_sample_data(effects_source_t source, TickType_t timeout_tick_time);
+void sources_set_gain(float new_gain);
+
+const processed_input_result_t* sources_await_processed_input_result(effects_source_t source, TickType_t timeout_tick_time);
 
 #ifdef __cplusplus
 }
