@@ -2,10 +2,10 @@ import numpy as np
 
 # Example usage
 num_bins = 19
-num_samples = 2048
+num_samples = 1024
 min_value = 3
 
-def calculate_bin_edges(num_bins, num_samples, scale='log', skew=1.6, min_value=2):
+def calculate_bin_edges(num_bins, num_samples, scale, skew, min_value):
     if scale == 'log':
         max_value = num_samples
         
@@ -26,7 +26,7 @@ def calculate_bin_edges(num_bins, num_samples, scale='log', skew=1.6, min_value=
 
     return edges
 
-def assign_samples_to_bins(num_bins, num_samples, skew=1.6, min_value=2):
+def assign_samples_to_bins(num_bins, num_samples, skew, min_value):
     # Calculate the bin edges
     bin_edges = calculate_bin_edges(num_bins, num_samples, scale='log', skew=skew, min_value=min_value)
     print(len(bin_edges), bin_edges)
@@ -37,7 +37,7 @@ def assign_samples_to_bins(num_bins, num_samples, skew=1.6, min_value=2):
 
     return bins
 
-bins = assign_samples_to_bins(num_bins, num_samples, skew=1.6, min_value=min_value)
+bins = assign_samples_to_bins(num_bins, num_samples, skew=2.2, min_value=min_value)
 bins_map = []
 bins[0] = (bins[0][0] - min_value, bins[0][1]) 
 

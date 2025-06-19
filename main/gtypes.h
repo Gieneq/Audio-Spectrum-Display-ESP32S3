@@ -20,6 +20,7 @@ extern "C" {
 
 typedef enum option_select_t {
     OPTION_SELECT_GAIN,
+    OPTION_SELECT_FREQUENCY,
     OPTION_SELECT_EFFECT,
     OPTION_SELECT_SOURCE,
 

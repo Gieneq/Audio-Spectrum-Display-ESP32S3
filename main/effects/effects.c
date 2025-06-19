@@ -44,6 +44,9 @@ static void effects_task(void *params) {
                 case EFFECTS_CMD_SET_GAIN:
                     sources_set_gain(received_cmd.data.gain);
                     break;
+                case EFFECTS_CMD_SET_FREQUENCY:
+                    sources_set_frequency(received_cmd.data.frequency);
+                    break;
                 case EFFECTS_CMD_SET_EFFECT:
                     recent_effect = received_cmd.data.effects_type;
                     break;

@@ -18,9 +18,10 @@ extern "C" {
 
 
 typedef enum effects_cmd_type_t {
-    EFFECTS_CMD_SET_GAIN,   // payload: float, passed deep to sources
-    EFFECTS_CMD_SET_SOURCE, // payload: Micro, Wired, Simulation
-    EFFECTS_CMD_SET_EFFECT, // payload: Fire, Electric, Simple ...
+    EFFECTS_CMD_SET_GAIN,           // payload: float, passed deep to sources
+    EFFECTS_CMD_SET_FREQUENCY,      // payload: float, passed deep to simulation source
+    EFFECTS_CMD_SET_SOURCE,         // payload: Micro, Wired, Simulation
+    EFFECTS_CMD_SET_EFFECT,         // payload: Fire, Electric, Simple ...
 } effects_cmd_type_t;
 
 // Effect idea: fireplace animation with speed/intensity varied by dynamics of input
@@ -32,6 +33,7 @@ typedef enum effects_type_t {
 
 typedef union effects_cmd_data_t {
     float gain;
+    float frequency;
     effects_source_t effects_source;
     effects_type_t effects_type;
 } effects_cmd_data_t;
