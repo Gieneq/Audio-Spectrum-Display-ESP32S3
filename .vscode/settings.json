@@ -74,6 +74,8 @@
         "esp_random.h": "c",
         "effects.h": "c",
         "sources.h": "c",
-        "any": "c"
+        "any": "c",
+        "timers.h": "c",
+        "bitset": "c"
     }
 }

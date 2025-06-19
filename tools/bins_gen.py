@@ -1,5 +1,10 @@
 import numpy as np
 
+# Example usage
+num_bins = 19
+num_samples = 2048
+min_value = 3
+
 def calculate_bin_edges(num_bins, num_samples, scale='log', skew=1.6, min_value=2):
     if scale == 'log':
         max_value = num_samples
@@ -32,10 +37,6 @@ def assign_samples_to_bins(num_bins, num_samples, skew=1.6, min_value=2):
 
     return bins
 
-# Example usage
-num_bins = 21
-num_samples = 1024
-min_value = 3
 bins = assign_samples_to_bins(num_bins, num_samples, skew=1.6, min_value=min_value)
 bins_map = []
 bins[0] = (bins[0][0] - min_value, bins[0][1]) 

@@ -6,6 +6,18 @@ extern "C" {
 
 #include <stdint.h>
 
+#define MIN(_a, _b) ((_a) < (_b) ? (_a) : (_b))
+#define MAX(_a, _b) ((_a) > (_b) ? (_a) : (_b))
+#define CONSTRAIN(_v, _min, _max) ((_v) < (_min) ? (_min) : ((_v) > (_max) ? (_max) : (_v)))
+
+#define MAP(_x, _in_min, _in_max, _out_min, _out_max) \
+    (((_x) - (_in_min)) * ((_out_max) - (_out_min)) / ((_in_max) - (_in_min)) + (_out_min))
+
+#define NORMALIZE(_x, _in_min, _in_max) \
+    CONSTRAIN(((_x) - (_in_min)) / ((_in_max) - (_in_min)), 0.0f, 1.0f)
+
+#define LERP(_a, _b, _t) ((_a) + ((_b) - (_a)) * (_t))
+
 typedef enum option_select_t {
     OPTION_SELECT_GAIN,
     OPTION_SELECT_EFFECT,
