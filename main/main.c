@@ -56,7 +56,7 @@ static float ampl_gain = 1.0F;
 static uint8_t sim_frequency_idx = 5; // 1kHz
 static option_select_t recent_option_selected = OPTION_SELECT_GAIN;
 static effect_select_t recent_effect_selected = EFFECT_SELECT_RAW;
-// static option_source_t recent_source_selected = OPTION_SOURCE_SIMULATION;
+static option_source_t recent_source_selected = OPTION_SOURCE_MICROPHONE;
 
 static void info_prints() {
     /* Print chip information */
@@ -164,6 +164,21 @@ static void button_left_released_callback(void *arg, void *data) {
             //TODO
             ESP_LOGI(TAG, "Effect loop left to: %d.", recent_effect_selected);
             break;
+
+        case OPTION_SELECT_SOURCE:
+            if (recent_source_selected == OPTION_SOURCE_SIMULATION) {
+                recent_source_selected = OPTION_SOURCE_MICROPHONE;
+                cmd.data.effects_source = EFFECTS_SOURCE_MICROPHONE;
+            } else {
+                recent_source_selected = OPTION_SOURCE_SIMULATION;
+                cmd.data.effects_source = EFFECTS_SOURCE_SIMULATION;
+            }
+            
+            cmd.type = EFFECTS_CMD_SET_SOURCE;
+            effects_send_cmd(cmd);
+
+            model_if->set_source(recent_source_selected);
+            break;
             
         default:
             break;
@@ -243,6 +258,22 @@ static void button_right_released_callback(void *arg, void *data) {
             //TODO
             ESP_LOGI(TAG, "Effect loop right to: %d.", recent_effect_selected);
             break;
+
+        case OPTION_SELECT_SOURCE:
+            if (recent_source_selected == OPTION_SOURCE_SIMULATION) {
+                recent_source_selected = OPTION_SOURCE_MICROPHONE;
+                cmd.data.effects_source = EFFECTS_SOURCE_MICROPHONE;
+            } else {
+                recent_source_selected = OPTION_SOURCE_SIMULATION;
+                cmd.data.effects_source = EFFECTS_SOURCE_SIMULATION;
+            }
+            
+            cmd.type = EFFECTS_CMD_SET_SOURCE;
+            effects_send_cmd(cmd);
+
+            model_if->set_source(recent_source_selected);
+            break;
+
         default:
             break;
         }

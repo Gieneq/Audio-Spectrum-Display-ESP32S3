@@ -30,6 +30,7 @@ typedef struct model_t {
     struct {
         float gain;
         float frequency;
+        option_source_t source;
     } options_values;
 
     option_select_t option_selected;
@@ -66,6 +67,10 @@ static void model_set_frequency(float freq) {
     get_model()->options_values.frequency = freq;
 }
 
+static void model_set_source(option_source_t source) {
+    get_model()->options_values.source = source;
+}
+
 static model_t* get_model() {
     static model_t* _model_ptr;
     if(!_model_ptr) {
@@ -80,12 +85,14 @@ static model_t* get_model() {
         _model_ptr->interface.set_option_selected = model_set_option_selected;
         _model_ptr->interface.set_gain = model_set_gain;
         _model_ptr->interface.set_frequency= model_set_frequency;
+        _model_ptr->interface.set_source = model_set_source;
 
         _model_ptr->front_buttons.left_clicked = false;
         _model_ptr->front_buttons.right_clicked = false;
 
         _model_ptr->options_values.gain = 1.0F;
         _model_ptr->options_values.frequency = 1000.0F;
+        _model_ptr->options_values.source = OPTION_SOURCE_MICROPHONE;
 
         _model_ptr->option_selected = OPTION_SELECT_GAIN;
 
@@ -122,11 +129,10 @@ void model_tick() {
     if (model_interface_access(&model_if, portMAX_DELAY)) {
         (void)model_if; //not needed, only lock recsources
 
-        //todo use bar heights
+        /* Some internal updates, called before drawing */
 
         model_interface_release();
     }
-
 }
 
 void model_draw(gdisplay_api_t* gd_api) {
@@ -151,25 +157,41 @@ void model_draw(gdisplay_api_t* gd_api) {
             gd_api->draw_bytes_bitmap(256, 4, BTN_RIGHT_WIDTH, btn_right_graphics_bytes, BTN_RIGHT_BYTES_COUNT);
         }
 
+        /* Central value & label */
         if (get_model()->option_selected == OPTION_SELECT_GAIN) {
-
             snprintf(text_buff, sizeof(text_buff), "%.3f", get_model()->options_values.gain);
             gd_api->draw_text(140, 41, &font_rockwell_4pt, text_buff);
 
             gd_api->draw_bytes_bitmap(68, 6, LABEL_GAIN_WIDTH, label_gain_graphics_bytes, LABEL_GAIN_BYTES_COUNT);
-        } else if (get_model()->option_selected == OPTION_SELECT_FREQUENCY) {
-
+        } 
+        else if (get_model()->option_selected == OPTION_SELECT_FREQUENCY) {
             snprintf(text_buff, sizeof(text_buff), "%.3f", get_model()->options_values.frequency);
             gd_api->draw_text(140, 41, &font_rockwell_4pt, text_buff);
 
             gd_api->draw_text(68, 6, &font_rockwell_4pt, "FREQUENCY");
-            // gd_api->draw_bytes_bitmap(68, 6, LABEL_GAIN_WIDTH, label_gain_graphics_bytes, LABEL_GAIN_BYTES_COUNT);
-        } else if (get_model()->option_selected == OPTION_SELECT_SOURCE) {
+        } 
+        else if (get_model()->option_selected == OPTION_SELECT_SOURCE) {
+            const char* source_text = NULL;
+            switch (get_model()->options_values.source) {
+            case OPTION_SOURCE_SIMULATION:
+                source_text = "SIMULATION";
+                break;
+
+            case OPTION_SOURCE_MICROPHONE:
+                source_text = "MICROPHONE";
+                break;
+
+            default:
+                source_text = "UNKNOWN";
+            }
+
+            gd_api->draw_text(140, 41, &font_rockwell_4pt, source_text);
+
             gd_api->draw_bytes_bitmap(68, 6, LABEL_SOURCE_WIDTH, label_source_graphics_bytes, LABEL_SOURCE_BYTES_COUNT);
-        } else if (get_model()->option_selected == OPTION_SELECT_EFFECT) {
+        } 
+        else if (get_model()->option_selected == OPTION_SELECT_EFFECT) {
             gd_api->draw_bytes_bitmap(68, 6, LABEL_EFFECT_WIDTH, label_effect_graphics_bytes, LABEL_EFFECT_BYTES_COUNT);
         }
-
         
         /* Display background: base + grid box */
         gd_api->draw_rect(VIS_BASE_X, VIS_BASE_Y, VIS_DISPLAY_BASE_WIDTH, VIS_DISPLAY_BASE_HEIGHT, VIS_DISPLAY_BASE_COLOR);
