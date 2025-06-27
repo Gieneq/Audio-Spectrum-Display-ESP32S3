@@ -43,6 +43,20 @@ static RingbufHandle_t ringbuff_handle;
 static int16_t receiver_buffer[INPUT_SAMPLES_COUNT];
 static int16_t recording_buffer[MIC_RECORDING_BUFF_LENGHT] = {0};
 
+#ifdef DEBUG_SOURCE_MICROPHONE
+#define DEBUG_SOURCE_MICROPHONE_LOG_INTERVAL_MS 250
+static int64_t last_debug_log_time_us;
+
+static int64_t last_codec_read_time_us;
+static int64_t recent_codec_read_time_us;
+static int64_t interval_codec_read_time_us;
+
+static int64_t last_ringbuffer_receive_time_us;
+static int64_t recent_ringbuffer_receive_time_us;
+static int64_t interval_ringbuffer_receive_time_us;
+static size_t last_ringbuffer_samples_received_count;
+#endif
+
 static void mic_sampler_task(void* params) {
     int ret = ESP_CODEC_DEV_OK;
 
@@ -70,27 +84,15 @@ static void mic_sampler_task(void* params) {
         ESP_ERROR_CHECK(ret);
     }
 
-    // int idx = 0;
-
     while(1) {   
         ESP_ERROR_CHECK(esp_codec_dev_read(mic_codec_dev, recording_buffer, MIC_RECORDING_BUFF_SIZE));
-        // idx += 1;
+        // Capturing 512 samples every: 10885 - 16339 us, mostly lover time.
 
-        // if (idx > 25) {
-        //     idx = 0;
-        //     printf("%d, %d, %d, %d, %d, %d, %d, %d, %d, %d\n",
-        //         recording_buffer[0],
-        //         recording_buffer[1],
-        //         recording_buffer[2],
-        //         recording_buffer[3],
-        //         recording_buffer[4],
-        //         recording_buffer[5],
-        //         recording_buffer[6],
-        //         recording_buffer[7],
-        //         recording_buffer[8],
-        //         recording_buffer[9]
-        //     );
-        // }
+#ifdef DEBUG_SOURCE_MICROPHONE
+        recent_codec_read_time_us = esp_timer_get_time();
+        interval_codec_read_time_us = recent_codec_read_time_us - last_codec_read_time_us;
+        last_codec_read_time_us = recent_codec_read_time_us;
+#endif
 
         if(xRingbufferSend(ringbuff_handle, (void*)recording_buffer, MIC_RECORDING_BUFF_SIZE, 0) == pdFALSE) {
             ESP_LOGW(TAG, "Microphone samples ringbuffer stall!");
@@ -100,6 +102,9 @@ static void mic_sampler_task(void* params) {
 
 static void source_microphones_task(void* params) {
     ESP_LOGI(TAG, "Start task");
+#ifdef DEBUG_SOURCE_MICROPHONE
+    last_debug_log_time_us = esp_timer_get_time();
+#endif
 
     size_t receiver_buffer_idx = 0;
     size_t remaining_halfwords_count = INPUT_SAMPLES_COUNT;
@@ -116,6 +121,8 @@ static void source_microphones_task(void* params) {
         );
 
         if (data && actual_bytes_count > 0) {
+            // I noticed: actual_bytes_count is: 1024 or 2048
+
             size_t actual_halfwords_count = actual_bytes_count / sizeof(int16_t);
             memcpy(receiver_buffer + receiver_buffer_idx, data, actual_bytes_count);
             receiver_buffer_idx += actual_halfwords_count;
@@ -123,6 +130,14 @@ static void source_microphones_task(void* params) {
             vRingbufferReturnItem(ringbuff_handle, (void*)data);
 
             if (remaining_halfwords_count == 0) {
+            // I noticed: interval: 30074 - 51144
+            
+#ifdef DEBUG_SOURCE_MICROPHONE
+            recent_ringbuffer_receive_time_us = esp_timer_get_time();
+            interval_ringbuffer_receive_time_us = recent_ringbuffer_receive_time_us - last_ringbuffer_receive_time_us;
+            last_ringbuffer_receive_time_us = recent_ringbuffer_receive_time_us;
+            last_ringbuffer_samples_received_count = actual_bytes_count;
+#endif
                 // Fill output buffer
                 for (size_t i = 0; i < INPUT_SAMPLES_COUNT; ++i) {
                     const float sample_scaled = ((float)receiver_buffer[i]) * common_gain;
@@ -133,6 +148,7 @@ static void source_microphones_task(void* params) {
 
                 input_samples_window.timestamp_us = esp_timer_get_time();
 
+                // Notify
                 xEventGroupSetBits(event_group, SAMPLES_READY_BIT);
 
                 // Reset for next round
@@ -140,6 +156,16 @@ static void source_microphones_task(void* params) {
                 remaining_halfwords_count = INPUT_SAMPLES_COUNT;
             }
         }
+
+#ifdef DEBUG_SOURCE_MICROPHONE
+        if (esp_timer_get_time() > (last_debug_log_time_us + DEBUG_SOURCE_MICROPHONE_LOG_INTERVAL_MS * 1000)) {
+            last_debug_log_time_us = esp_timer_get_time();
+            ESP_LOGI(TAG, "micr: %lld us, micr_cnt: %u, rb_rcv: %lld us, rb_cnt: %u/%u",
+                interval_codec_read_time_us, MIC_RECORDING_BUFF_LENGHT,
+                interval_ringbuffer_receive_time_us, last_ringbuffer_samples_received_count, INPUT_SAMPLES_COUNT
+            );
+        }
+#endif
 
     }
 

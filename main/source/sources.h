@@ -14,6 +14,12 @@ extern "C" {
 // effects is task
 // but this is just think layer, maybe some selector
 
+/* Uncomment to debug microphone source */
+// #define DEBUG_SOURCE_MICROPHONE
+
+/* Uncomment to debug wired source */
+// #define DEBUG_SOURCE_WIRED
+
 #define BINS_COUNT          19
 
 #define FFT_SIZE            (INPUT_SAMPLES_COUNT)

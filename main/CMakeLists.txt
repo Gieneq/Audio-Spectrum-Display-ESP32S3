@@ -11,6 +11,7 @@ idf_component_register(SRCS
                         "source/simulation.c" 
                         "source/microphones.c" 
                         "source/bins_map.c"
+                        "source/wired.c" 
                     REQUIRES ${requires}
                     PRIV_REQUIRES "esp_ringbuf" "espressif__esp-box-lite" "nvs_flash" "esp_wifi" "esp_event" "esp_netif" "esp_timer"
                     INCLUDE_DIRS "hmi")
