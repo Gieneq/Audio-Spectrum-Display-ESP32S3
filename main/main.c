@@ -15,7 +15,6 @@
 #include "esp_log.h"
 #include "esp_heap_caps.h"
 
-#include "gsampler.h"
 #include "gdisplay.h"
 #include "model.h"
 
