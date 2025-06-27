@@ -39,6 +39,11 @@ The WS2812B LED matrix synchronizes with the audio input, creating vibrant visua
 
 So far the device only uses builtin microphone. Soon it will be able to be connected to audio jack.
 
+// todo
+https://github.com/espressif/esp-box/blob/master/hardware/esp32_s3_box_lite_MB_V1.1/schematic/SCH_ESP32-S3-BOX-Lite_MB_V1.1_20211221.pdf
+
+Note! Set ADC2 continuous mode enabled despite errata warning 'CONFIG_ADC_CONTINUOUS_FORCE_USE_ADC2_ON_C3_S3'
+
 ## License
 
 This project is licensed under the MIT License.

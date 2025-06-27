@@ -41,6 +41,10 @@ extern const input_samples_window_t* source_simulation_await_input_samples_windo
 extern esp_err_t source_microphones_init();
 extern const input_samples_window_t* source_microphones_await_input_samples_window(TickType_t timeout_tick_time);
 
+// Wired
+extern esp_err_t source_wired_init();
+extern const input_samples_window_t* source_wired_await_input_samples_window(TickType_t timeout_tick_time);
+
 static processed_input_result_t processed_input_result;
 
 float common_gain = 1.0F;
@@ -71,6 +75,11 @@ esp_err_t sources_init_all() {
     }
 
     ret = source_microphones_init();
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    ret = source_wired_init();
     if (ret != ESP_OK) {
         return ret;
     }
@@ -160,9 +169,8 @@ const processed_input_result_t* sources_await_processed_input_result(effects_sou
         break;
 
     case EFFECTS_SOURCE_WIRED:
-        ESP_LOGW(TAG, "Not implemented");
-        input_samples_window = NULL;
-        break; // TODO
+        input_samples_window = source_wired_await_input_samples_window(timeout_tick_time);
+        break;
 
     default:
         ESP_LOGW(TAG, "Not implemented");

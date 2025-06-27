@@ -76,6 +76,9 @@
         "sources.h": "c",
         "any": "c",
         "timers.h": "c",
-        "bitset": "c"
+        "bitset": "c",
+        "gpio.h": "c",
+        "adc_continuous.h": "c",
+        "soc_caps.h": "c"
     }
 }
