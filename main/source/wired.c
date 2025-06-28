@@ -17,9 +17,7 @@
 #include "soc/soc_caps.h"
 #include "esp_timer.h"
 
-
 #ifdef DEBUG_SOURCE_WIRED
-
 #define DEBUG_SOURCE_WIRED_LOG_INTERVAL_MS 250
 static int64_t last_debug_log_time_us;
 static uint32_t last_continuous_adc_read_count;
@@ -43,6 +41,9 @@ static EventGroupHandle_t event_group = NULL;
 #define _EXAMPLE_ADC_UNIT_STR(unit)         #unit
 #define EXAMPLE_ADC_UNIT_STR(unit)          _EXAMPLE_ADC_UNIT_STR(unit)
 #define EXAMPLE_ADC_CONV_MODE               ADC_CONV_SINGLE_UNIT_1
+
+// ADC_ATTEN_DB_11 looks ok, input signal has high range
+
 #define EXAMPLE_ADC_ATTEN                   ADC_ATTEN_DB_11
 #define EXAMPLE_ADC_BIT_WIDTH               SOC_ADC_DIGI_MAX_BITWIDTH
 
@@ -52,6 +53,9 @@ static EventGroupHandle_t event_group = NULL;
 #define EXAMPLE_ADC_GET_DATA(p_data)        ((p_data)->type2.data)
 #endif
 
+// This helps align typical signal to fit scale
+#define SAMPLER_GAIN (3.2F)
+
 static const char *TAG = "SOURCE_WIRED";
 
 //https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf
@@ -59,7 +63,6 @@ static const char *TAG = "SOURCE_WIRED";
 // ADC1 CH0 -> GPIO1 (buttons)
 // ADC1 CH8 -> GPIO9
 // ADC1 CH9 -> GPIO10
-
 
 static adc_continuous_handle_t handle = NULL;
 
@@ -73,7 +76,7 @@ static bool IRAM_ATTR s_conv_done_cb(adc_continuous_handle_t handle, const adc_c
     BaseType_t mustYield = pdFALSE;
     //Notify that ADC continuous driver has done enough number of conversions
     if (task_handle) {
-    vTaskNotifyGiveFromISR(task_handle, &mustYield);
+        vTaskNotifyGiveFromISR(task_handle, &mustYield);
     }
     
 #ifdef DEBUG_SOURCE_WIRED
@@ -84,7 +87,6 @@ static bool IRAM_ATTR s_conv_done_cb(adc_continuous_handle_t handle, const adc_c
 
     return (mustYield == pdTRUE);
 }
-
 
 static void compute_samples() {
     const float ADC_FULL_SCALE = 4095.0f;
@@ -100,7 +102,7 @@ static void compute_samples() {
         // input signal is 0-3.3V
         // assume middle 1.65V
         // Convert to voltage
-        float voltage = (data / ADC_FULL_SCALE) * VREF;
+        float voltage = (((float)data) / ADC_FULL_SCALE) * VREF;
 
         // Shift to be centered around 0
         float sample = voltage - V_MID;
@@ -109,7 +111,7 @@ static void compute_samples() {
         float normalized = sample / V_MID;
 
         assert(sample_idx  < sizeof(input_samples_window.samples));
-        input_samples_window.samples[sample_idx++] = normalized;
+        input_samples_window.samples[sample_idx++] = normalized * SAMPLER_GAIN;
         input_samples_window.timestamp_us = (uint32_t)esp_timer_get_time();
     }
 }
