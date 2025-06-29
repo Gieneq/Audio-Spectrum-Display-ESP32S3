@@ -84,16 +84,62 @@ static void info_prints() {
     printf("Minimum free heap size: %" PRIu32 " bytes\n", esp_get_minimum_free_heap_size());
 }
 
-static adc_oneshot_unit_handle_t bsp_adc_handle = NULL;
+#define MYBSP_BUTTON_NUM 4
 
-static button_handle_t side_button;
+#define BUTTON_SIDE     (0)
+#define BUTTON_LEFT     (1)
+#define BUTTON_MID      (2)
+#define BUTTON_RIGHT    (3)
 
-#define BUTTONS_COUNT       (3)
-// static button_handle_t front_buttons[BUTTONS_COUNT];
+static button_handle_t buttons[MYBSP_BUTTON_NUM];
 
-#define ADC_BUTTON_LEFT     (0)
-#define ADC_BUTTON_MID      (1)
-#define ADC_BUTTON_RIGHT    (2)
+static const button_config_t mybsp_button_config[MYBSP_BUTTON_NUM] = {
+    {
+        .type = BUTTON_TYPE_GPIO,
+        .gpio_button_config.active_level = false,
+        .gpio_button_config.gpio_num = GPIO_NUM_0,
+    },
+    {
+        .type = BUTTON_TYPE_GPIO,
+        .gpio_button_config.active_level = false,
+        .gpio_button_config.gpio_num = GPIO_NUM_41,
+    },
+    {
+        .type = BUTTON_TYPE_GPIO,
+        .gpio_button_config.active_level = false,
+        .gpio_button_config.gpio_num = GPIO_NUM_1,
+    },
+    {
+        .type = BUTTON_TYPE_GPIO,
+        .gpio_button_config.active_level = false,
+        .gpio_button_config.gpio_num = GPIO_NUM_14,
+    },
+};
+
+static esp_err_t mybsp_iot_button_create(button_handle_t btn_array[], int *btn_cnt, int btn_array_size) {
+    esp_err_t ret = ESP_OK;
+    if ((btn_array_size < MYBSP_BUTTON_NUM) ||
+            (btn_array == NULL)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (btn_cnt) {
+        *btn_cnt = 0;
+    }
+
+    for (int i = 0; i < btn_array_size; i++) {
+        btn_array[i] = iot_button_create(&mybsp_button_config[i]);
+        if (btn_array[i] == NULL) {
+            ret = ESP_FAIL;
+            break;
+        }
+        if (btn_cnt) {
+            (*btn_cnt)++;
+        }
+    }
+
+    return ret;
+}
 
 static void button_side_released_callback(void *arg, void *data) {
     (void)arg;
@@ -166,13 +212,14 @@ static void button_left_released_callback(void *arg, void *data) {
 
         case OPTION_SELECT_SOURCE:
             if (recent_source_selected == OPTION_SOURCE_SIMULATION) {
+                recent_source_selected = OPTION_SOURCE_WIRED;
+            } else if (recent_source_selected == OPTION_SOURCE_WIRED) {
                 recent_source_selected = OPTION_SOURCE_MICROPHONE;
-                cmd.data.effects_source = EFFECTS_SOURCE_MICROPHONE;
             } else {
                 recent_source_selected = OPTION_SOURCE_SIMULATION;
-                cmd.data.effects_source = EFFECTS_SOURCE_SIMULATION;
             }
             
+            cmd.data.effects_source = recent_source_selected;
             cmd.type = EFFECTS_CMD_SET_SOURCE;
             effects_send_cmd(cmd);
 
@@ -261,12 +308,13 @@ static void button_right_released_callback(void *arg, void *data) {
         case OPTION_SELECT_SOURCE:
             if (recent_source_selected == OPTION_SOURCE_SIMULATION) {
                 recent_source_selected = OPTION_SOURCE_MICROPHONE;
-                cmd.data.effects_source = EFFECTS_SOURCE_MICROPHONE;
+            } else if (recent_source_selected == OPTION_SOURCE_MICROPHONE) {
+                recent_source_selected = OPTION_SOURCE_WIRED;
             } else {
                 recent_source_selected = OPTION_SOURCE_SIMULATION;
-                cmd.data.effects_source = EFFECTS_SOURCE_SIMULATION;
             }
             
+            cmd.data.effects_source = recent_source_selected;
             cmd.type = EFFECTS_CMD_SET_SOURCE;
             effects_send_cmd(cmd);
 
@@ -280,40 +328,6 @@ static void button_right_released_callback(void *arg, void *data) {
         model_interface_release();
     }
 }
-
-
-// static const button_config_t adc_button_config[BUTTONS_COUNT] = {
-//     {
-//         .type = BUTTON_TYPE_ADC,
-// #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
-//         .adc_button_config.adc_handle = &bsp_adc_handle,
-// #endif
-//         .adc_button_config.adc_channel = ADC_CHANNEL_0, // ADC1 channel 0 is GPIO1
-//         .adc_button_config.button_index = ADC_BUTTON_LEFT,
-//         .adc_button_config.min = 2310, // middle is 2410mV
-//         .adc_button_config.max = 2510
-//     },
-//     {
-//         .type = BUTTON_TYPE_ADC,
-// #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
-//         .adc_button_config.adc_handle = &bsp_adc_handle,
-// #endif
-//         .adc_button_config.adc_channel = ADC_CHANNEL_0, // ADC1 channel 0 is GPIO1
-//         .adc_button_config.button_index = ADC_BUTTON_MID,
-//         .adc_button_config.min = 1880, // middle is 1980mV
-//         .adc_button_config.max = 2080
-//     },
-//     {
-//         .type = BUTTON_TYPE_ADC,
-// #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
-//         .adc_button_config.adc_handle = &bsp_adc_handle,
-// #endif
-//         .adc_button_config.adc_channel = ADC_CHANNEL_0, // ADC1 channel 0 is GPIO1
-//         .adc_button_config.button_index = ADC_BUTTON_RIGHT,
-//         .adc_button_config.min = 720, // middle is 820mV
-//         .adc_button_config.max = 920
-//     },
-// };
 
 void app_main(void) {
     esp_err_t ret = ESP_OK;
@@ -346,43 +360,34 @@ void app_main(void) {
     ret = gdisplay_lcd_init();
     ESP_ERROR_CHECK(ret);
 
+    /* Tweaked BSP buttons */
+    ret = mybsp_iot_button_create(buttons, NULL, 4);
+    ESP_ERROR_CHECK(ret);
+    
     /* Side button */
-    ret = bsp_iot_button_create(&side_button, NULL, 1);
+    ret = iot_button_register_cb(buttons[BUTTON_SIDE], BUTTON_PRESS_UP, button_side_released_callback, NULL);
     ESP_ERROR_CHECK(ret);
     
-    ret = iot_button_register_cb(side_button, BUTTON_PRESS_UP, button_side_released_callback, NULL);
+    ret = iot_button_register_cb(buttons[BUTTON_SIDE], BUTTON_LONG_PRESS_START, button_side_longpressed_callback, NULL);
     ESP_ERROR_CHECK(ret);
-    
-    ret = iot_button_register_cb(side_button, BUTTON_LONG_PRESS_START, button_side_longpressed_callback, NULL);
-    ESP_ERROR_CHECK(ret);
-
-    // ESP_ERROR_CHECK(bsp_adc_initialize());
-    // bsp_adc_handle = bsp_adc_get_handle();
-    // assert(bsp_adc_handle);
 
     /* Front buttons */
 
-    // /* Left button */
-    // front_buttons[ADC_BUTTON_LEFT] = iot_button_create(&adc_button_config[ADC_BUTTON_LEFT]);
-    // assert(front_buttons[ADC_BUTTON_LEFT]);
-    // ret = iot_button_register_cb(front_buttons[ADC_BUTTON_LEFT], BUTTON_PRESS_DOWN, button_left_pressed_callback, NULL);
-    // ESP_ERROR_CHECK(ret);
-    // ret = iot_button_register_cb(front_buttons[ADC_BUTTON_LEFT], BUTTON_PRESS_UP, button_left_released_callback, NULL);
-    // ESP_ERROR_CHECK(ret);
+    /* Left button */
+    ret = iot_button_register_cb(buttons[BUTTON_LEFT], BUTTON_PRESS_DOWN, button_left_pressed_callback, NULL);
+    ESP_ERROR_CHECK(ret);
+    ret = iot_button_register_cb(buttons[BUTTON_LEFT], BUTTON_PRESS_UP, button_left_released_callback, NULL);
+    ESP_ERROR_CHECK(ret);
     
-    // /* MIddle button */
-    // front_buttons[ADC_BUTTON_MID] = iot_button_create(&adc_button_config[ADC_BUTTON_MID]);
-    // assert(front_buttons[ADC_BUTTON_MID]);
-    // ret = iot_button_register_cb(front_buttons[ADC_BUTTON_MID], BUTTON_PRESS_UP, button_middle_released_callback, NULL);
-    // ESP_ERROR_CHECK(ret);
+    /* MIddle button */
+    ret = iot_button_register_cb(buttons[BUTTON_MID], BUTTON_PRESS_UP, button_middle_released_callback, NULL);
+    ESP_ERROR_CHECK(ret);
 
-    // /* Right button */
-    // front_buttons[ADC_BUTTON_RIGHT] = iot_button_create(&adc_button_config[ADC_BUTTON_RIGHT]);
-    // assert(front_buttons[ADC_BUTTON_RIGHT]);
-    // ret = iot_button_register_cb(front_buttons[ADC_BUTTON_RIGHT], BUTTON_PRESS_DOWN, button_right_pressed_callback, NULL);
-    // ESP_ERROR_CHECK(ret);
-    // ret = iot_button_register_cb(front_buttons[ADC_BUTTON_RIGHT], BUTTON_PRESS_UP, button_right_released_callback, NULL);
-    // ESP_ERROR_CHECK(ret);
+    /* Right button */
+    ret = iot_button_register_cb(buttons[BUTTON_RIGHT], BUTTON_PRESS_DOWN, button_right_pressed_callback, NULL);
+    ESP_ERROR_CHECK(ret);
+    ret = iot_button_register_cb(buttons[BUTTON_RIGHT], BUTTON_PRESS_UP, button_right_released_callback, NULL);
+    ESP_ERROR_CHECK(ret);
 
     ESP_LOGV(TAG, "MEM available: Any=%u B, DMA=%u B, SPI=%u B.", 
         heap_caps_get_free_size(MALLOC_CAP_8BIT),

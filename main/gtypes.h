@@ -40,6 +40,7 @@ typedef enum effect_select_t {
 typedef enum option_source_t {
     OPTION_SOURCE_SIMULATION,
     OPTION_SOURCE_MICROPHONE,
+    OPTION_SOURCE_WIRED,
 
     OPTION_SOURCE_COUNT,
 } option_source_t;

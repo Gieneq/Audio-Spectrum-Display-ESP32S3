@@ -33,7 +33,7 @@ static led_matrix_t workspace_led_matrix;
 static void effects_task(void *params) {
     ESP_LOGI(TAG, "Start task");
 
-    effects_source_t recent_source = EFFECTS_SOURCE_WIRED;
+    effects_source_t recent_source = EFFECTS_SOURCE_MICROPHONE;
     effects_type_t recent_effect = EFFECTS_TYPE_SIMPLE;
     effects_cmd_t received_cmd;
 
