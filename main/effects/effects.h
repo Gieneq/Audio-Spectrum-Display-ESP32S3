@@ -10,13 +10,6 @@ extern "C" {
 #include "../leds/led_matrix.h"
 #include "freertos/FreeRTOS.h"
 
-
-// Ideas: 
-// - control via commands queue like: struct(enum-type + union-data)
-// - control options: set gain, select source, select type
-// - draw function setting led_matrix
-
-
 typedef enum effects_cmd_type_t {
     EFFECTS_CMD_SET_GAIN,           // payload: float, passed deep to sources
     EFFECTS_CMD_SET_FREQUENCY,      // payload: float, passed deep to simulation source
@@ -26,6 +19,7 @@ typedef enum effects_cmd_type_t {
 
 // Effect idea: fireplace animation with speed/intensity varied by dynamics of input
 typedef enum effects_type_t {
+    EFFECTS_TYPE_RAW,
     EFFECTS_TYPE_SIMPLE,
     EFFECTS_TYPE_FIRE,
     EFFECTS_TYPE_ELECTRIC,
@@ -42,13 +36,6 @@ typedef struct effects_cmd_t {
     effects_cmd_type_t type;
     effects_cmd_data_t data;
 } effects_cmd_t;
-
-
-// typedef struct effects_input_data_t {
-
-// } effects_input_data_t;
-
-// typedef effects_input_data_t (*await_effect_input_data_t)(TickType_t);
 
 esp_err_t effects_init();
 

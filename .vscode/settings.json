@@ -78,6 +78,7 @@
         "timers.h": "c",
         "bitset": "c",
         "adc_sampler.h": "c",
-        "adc_continuous.h": "c"
+        "adc_continuous.h": "c",
+        "soc_caps.h": "c"
     }
 }

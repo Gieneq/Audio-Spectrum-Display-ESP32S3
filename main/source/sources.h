@@ -34,6 +34,7 @@ extern "C" {
 
 typedef struct processed_input_result_t {
     float bins[BINS_COUNT];
+    float dt_sec;
 } processed_input_result_t;
 
 esp_err_t sources_init_all();

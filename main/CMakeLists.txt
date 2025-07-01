@@ -6,6 +6,7 @@ idf_component_register(SRCS
                         "rf/rf_sender.c" "rf/asd_packet.c" 
                         "leds/led_matrix.c" 
                         "effects/effects.c" 
+                        "effects/types/raw.c"
                         "effects/types/simple.c"
                         "source/sources.c" 
                         "source/simulation.c" 

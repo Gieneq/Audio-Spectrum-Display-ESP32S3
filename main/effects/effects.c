@@ -21,6 +21,7 @@
 
 #define EFFECTS_DATA_PROCESSED_BIT BIT0
 
+extern void effect_raw(led_matrix_t* led_matrix, const processed_input_result_t* processed_input_result);
 extern void effect_simple(led_matrix_t* led_matrix, const processed_input_result_t* processed_input_result);
 
 static const char *TAG = "EFFECTS";
@@ -61,6 +62,10 @@ static void effects_task(void *params) {
 
         // Apply effect
         switch (recent_effect) {
+        case EFFECTS_TYPE_RAW:
+            effect_raw(&workspace_led_matrix, processed_input_result);
+            break;
+
         case EFFECTS_TYPE_SIMPLE:
             effect_simple(&workspace_led_matrix, processed_input_result);
             break;

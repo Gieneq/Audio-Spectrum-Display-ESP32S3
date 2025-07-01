@@ -17,6 +17,7 @@
 #include "esp_mac.h"
 #include "esp_now.h"
 #include "esp_crc.h"
+#include "esp_timer.h"
 #include "../gtypes.h"
 
 #include "esp_dsp.h"
@@ -32,6 +33,10 @@ static float fft_input_complex[FFT_SIZE * 2] __attribute__((aligned(16)));
 static float fft_magnitude[FFT_RESULT_SIZE] __attribute__((aligned(16)));
 
 static float window[FFT_SIZE]  __attribute__((aligned(16)));
+
+static int64_t recent_calculation_time_us;
+static int64_t last_calculation_time_us;
+static int64_t interval_calculation_time_us;
 
 // Simulation
 extern esp_err_t source_simulation_init();
@@ -153,6 +158,12 @@ static esp_err_t process_input_samples_window(const input_samples_window_t* inpu
     //     printf("%.2f, ", result->bins[i]);
     // }
     // printf("]\n");
+
+    recent_calculation_time_us = esp_timer_get_time();
+    interval_calculation_time_us = recent_calculation_time_us - last_calculation_time_us;
+    last_calculation_time_us = recent_calculation_time_us;
+
+    result->dt_sec = ((float)interval_calculation_time_us) / 1000000.0F;
 
     return ESP_OK;
 }

@@ -14,6 +14,7 @@
 #include "nvs_flash.h"
 #include "esp_log.h"
 #include "esp_heap_caps.h"
+#include "esp_timer.h"
 
 #include "gdisplay.h"
 #include "model.h"
@@ -27,6 +28,8 @@
 #include "effects/effects.h"
 
 static const char TAG[] = "Main";
+
+// #define DEBUG_MAIN
 
 #define SIM_FREQUENCIES_COUNT 16
 static const float SIM_FREQUENCIES[SIM_FREQUENCIES_COUNT] = {
@@ -329,6 +332,15 @@ static void button_right_released_callback(void *arg, void *data) {
     }
 }
 
+#ifdef DEBUG_MAIN
+#define DEBUG_MAIN_LOG_INTERVAL_MS 250
+static int64_t last_debug_log_time_us;
+
+static int64_t last_loop_time_us;
+static int64_t recent_loop_time_us;
+static int64_t interval_loop_time_us;
+#endif
+
 void app_main(void) {
     esp_err_t ret = ESP_OK;
 
@@ -396,8 +408,14 @@ void app_main(void) {
     );
    
     vTaskDelay(pdMS_TO_TICKS(1000));
-   
     while(1) {
+        // Measured interval around 30-70ms, depends on sampling time
+    
+#ifdef DEBUG_MAIN
+    recent_loop_time_us = esp_timer_get_time();
+    interval_loop_time_us = recent_loop_time_us - last_loop_time_us;
+    last_loop_time_us = recent_loop_time_us;
+#endif
         effects_draw_to_led_matrix(led_matrix);
 
         model_interface_t* model_if = NULL;
@@ -411,11 +429,16 @@ void app_main(void) {
             ESP_LOGE(TAG, "rf_sender_send_led_matrix failed");
         }
 
-        // vTaskDelay(pdMS_TO_TICKS(10));
-        ESP_LOGV(TAG, "MEM available: Any=%u B, DMA=%u B, SPI=%u B.", 
-            heap_caps_get_free_size(MALLOC_CAP_8BIT),
-            heap_caps_get_free_size(MALLOC_CAP_DMA),
-            heap_caps_get_free_size(MALLOC_CAP_SPIRAM)
-        );
+#ifdef DEBUG_MAIN
+        if (esp_timer_get_time() > (last_debug_log_time_us + DEBUG_MAIN_LOG_INTERVAL_MS * 1000)) {
+            last_debug_log_time_us = esp_timer_get_time();
+            ESP_LOGI(TAG, "MEM available: Any=%u B, DMA=%u B, SPI=%u B. Main loop: %lld us.", 
+                heap_caps_get_free_size(MALLOC_CAP_8BIT),
+                heap_caps_get_free_size(MALLOC_CAP_DMA),
+                heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+                interval_loop_time_us
+            );
+        }
+#endif
     }
 }
