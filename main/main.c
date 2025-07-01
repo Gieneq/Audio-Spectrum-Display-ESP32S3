@@ -411,7 +411,7 @@ void app_main(void) {
             ESP_LOGE(TAG, "rf_sender_send_led_matrix failed");
         }
 
-        vTaskDelay(pdMS_TO_TICKS(20));
+        // vTaskDelay(pdMS_TO_TICKS(10));
         ESP_LOGV(TAG, "MEM available: Any=%u B, DMA=%u B, SPI=%u B.", 
             heap_caps_get_free_size(MALLOC_CAP_8BIT),
             heap_caps_get_free_size(MALLOC_CAP_DMA),

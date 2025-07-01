@@ -54,7 +54,7 @@ static EventGroupHandle_t event_group = NULL;
 #endif
 
 // This helps align typical signal to fit scale
-#define SAMPLER_GAIN (3.2F)
+#define SAMPLER_GAIN (5.0F)
 
 static const char *TAG = "SOURCE_WIRED";
 

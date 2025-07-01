@@ -113,10 +113,11 @@ static void run_fft(const float* samples, float* out_fft_magnitude) {
         out_fft_magnitude[i] = mag > FFT_THRESHOLD ? mag : 0.0f;
     }
 }
+
 static void fft_fill_bins(const float* fft_mag, float* out_bins) {
     memset(out_bins, 0, sizeof(float) * BINS_COUNT);
 
-    for (int i = 0; i < FFT_RESULT_SIZE; i++) {
+    for (int i = FFT_DROPPED_SAMPLES_UP_TO; i < FFT_RESULT_SIZE; i++) {
 #if USE_CUSTOM_BINS_MAPPING == 0
         uint8_t bin_idx = i / 54;
         bin_idx = MIN(bin_idx, BINS_COUNT - 1);

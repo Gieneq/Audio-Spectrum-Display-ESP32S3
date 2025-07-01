@@ -25,6 +25,9 @@ extern "C" {
 #define FFT_SIZE            (INPUT_SAMPLES_COUNT)
 #define FFT_RESULT_SIZE     (FFT_SIZE / 2)
 
+// Used to remove 50Hz Grid noise
+#define FFT_DROPPED_SAMPLES_UP_TO 2
+
 #define FFT_THRESHOLD       0.1F
 #define FFT_CUSTOM_SCALE    (3.5)
 #define FFT_SCALE           (FFT_CUSTOM_SCALE * 1.0F / (FFT_SIZE / 2))
