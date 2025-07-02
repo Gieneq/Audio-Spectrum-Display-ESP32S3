@@ -82,6 +82,16 @@ typedef struct color_24b_t {
     
 } __attribute__((packed)) color_24b_t;
 
+#define WHITE ((color_24b_t){ .red = 255, .green = 255, .blue = 255 })
+
+#define COLOR_24B(_red, _green, _blue) ((color_24b_t){ .red = _red, .green = _green, .blue = _blue })
+
+static inline void color_24b_set_rgb(color_24b_t* color, uint8_t red, uint8_t green, uint8_t blue) {
+    color->red = red;
+    color->green = green;
+    color->blue = blue;
+}
+
 color_16b_t color_24b_to16b(color_24b_t color_24b);
 
 

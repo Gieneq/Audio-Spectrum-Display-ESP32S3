@@ -22,6 +22,7 @@ typedef enum effects_type_t {
     EFFECTS_TYPE_RAW,
     EFFECTS_TYPE_SIMPLE,
     EFFECTS_TYPE_FIRE,
+    EFFECTS_TYPE_MULTICOLOR,
     EFFECTS_TYPE_ELECTRIC,
 } effects_type_t;
 

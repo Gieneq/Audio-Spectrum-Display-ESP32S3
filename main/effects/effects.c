@@ -23,6 +23,7 @@
 
 extern void effect_raw(led_matrix_t* led_matrix, const processed_input_result_t* processed_input_result);
 extern void effect_simple(led_matrix_t* led_matrix, const processed_input_result_t* processed_input_result);
+extern void effect_multicolor(const led_matrix_t* led_matrix, const processed_input_result_t* processed_input_result);
 
 static const char *TAG = "EFFECTS";
 
@@ -35,7 +36,7 @@ static void effects_task(void *params) {
     ESP_LOGI(TAG, "Start task");
 
     effects_source_t recent_source = EFFECTS_SOURCE_MICROPHONE;
-    effects_type_t recent_effect = EFFECTS_TYPE_SIMPLE;
+    effects_type_t recent_effect = EFFECTS_TYPE_MULTICOLOR;
     effects_cmd_t received_cmd;
 
     while(1) {
@@ -68,6 +69,10 @@ static void effects_task(void *params) {
 
         case EFFECTS_TYPE_SIMPLE:
             effect_simple(&workspace_led_matrix, processed_input_result);
+            break;
+
+        case EFFECTS_TYPE_MULTICOLOR:
+            effect_multicolor(&workspace_led_matrix, processed_input_result);
             break;
         
         default:

@@ -9,8 +9,8 @@
 static float gravity = 120.0F;
 
 typedef struct bar_t {
-    float peak_y;
-    float peak_velocity;
+    float body_y;
+    float body_vel_y;
 } bar_t;
 
 static bar_t bars[LED_MATRIX_COLUMNS];
@@ -30,19 +30,19 @@ void effect_simple(led_matrix_t* led_matrix, const processed_input_result_t* pro
 
         bar_t* bar = &bars[ix];
 
-        if (bin_constrained > bar->peak_y) {
+        if (bin_constrained > bar->body_y) {
             // New peak is higher → “jump” bar to new value and reset velocity
-            bar->peak_y = bin_constrained;
-            bar->peak_velocity = 0.0f;
+            bar->body_y = bin_constrained;
+            bar->body_vel_y = 0.0f;
         } else {
             // Otherwise, apply gravity
-            bar->peak_velocity -= gravity * delta_time;
-            bar->peak_y += bar->peak_velocity * delta_time;
+            bar->body_vel_y -= gravity * delta_time;
+            bar->body_y += bar->body_vel_y * delta_time;
 
             // Clamp bar peak to floor
-            if (bar->peak_y < 0.0f) {
-                bar->peak_y = 0.0f;
-                bar->peak_velocity = 0.0f;
+            if (bar->body_y < 0.0f) {
+                bar->body_y = 0.0f;
+                bar->body_vel_y = 0.0f;
             }
         }
     }
@@ -51,7 +51,7 @@ void effect_simple(led_matrix_t* led_matrix, const processed_input_result_t* pro
     for (uint8_t ix = 0; ix < LED_MATRIX_COLUMNS; ++ix) {
         bar_t* bar = &bars[ix];
 
-        const float y_constrained = CONSTRAIN((bar->peak_y), 0, 255);
+        const float y_constrained = CONSTRAIN((bar->body_y), 0, 255);
         const uint8_t y_peak = roundf(y_constrained);
         const uint8_t y_peak_constrained = MIN(y_peak, (LED_MATRIX_ROWS-1));
 
