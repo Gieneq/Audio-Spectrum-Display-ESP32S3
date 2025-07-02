@@ -56,3 +56,19 @@ const hsv_t flame_tongue[LED_MATRIX_ROWS] = {
     HSV(3,    1.00f, 0.11f),
     HSV(2,    1.00f, 0.05f),
 };
+
+const color_24b_t SMOKE_PUFFS_colors[SMOKE_PUFFS_COLORS_COUNT] = {
+    // Hot particle: 2
+    COLOR_24B(89, 11, 0),
+    COLOR_24B(55, 5, 0),
+
+    // Gray smoke: 8
+    COLOR_24B(56, 56, 56),
+    COLOR_24B(51, 51, 51),
+    COLOR_24B(46, 46, 46),
+    COLOR_24B(42, 42, 42),
+    COLOR_24B(35, 35, 35),
+    COLOR_24B(31, 31, 31),
+    COLOR_24B(23, 23, 23),
+    COLOR_24B(18, 18, 18),
+};
