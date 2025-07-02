@@ -82,7 +82,7 @@ static void update_blocks(const processed_input_result_t* processed_input_result
     }
 }
 
-static void draw(led_matrix_t* led_matrix) {
+static void draw(const led_matrix_t* led_matrix) {
     for (uint8_t ix = 0; ix < LED_MATRIX_COLUMNS; ++ix) {
         bar_t* bar = &bars[ix];
 
@@ -108,8 +108,6 @@ static void draw(led_matrix_t* led_matrix) {
 }
 
 void effect_multicolor(const led_matrix_t* led_matrix, const processed_input_result_t* processed_input_result) {
-    led_matrix_clear(led_matrix);
-
     update_bodies(processed_input_result);
     
     update_blocks(processed_input_result);

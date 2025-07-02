@@ -6,9 +6,7 @@
 #include "../../gtypes.h"
 #include <math.h>
 
-void effect_raw(led_matrix_t* led_matrix, const processed_input_result_t* processed_input_result) {
-    led_matrix_clear(led_matrix);
-
+void effect_raw(const led_matrix_t* led_matrix, const processed_input_result_t* processed_input_result) {
     for (uint8_t ix = 0; ix < LED_MATRIX_COLUMNS; ++ix) {
         const float bin_scaled = processed_input_result->bins[ix] * 2.0;
         const float bin_constrained = CONSTRAIN(bin_scaled, 0, 255);

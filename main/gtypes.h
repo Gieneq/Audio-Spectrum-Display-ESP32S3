@@ -92,8 +92,20 @@ static inline void color_24b_set_rgb(color_24b_t* color, uint8_t red, uint8_t gr
     color->blue = blue;
 }
 
-color_16b_t color_24b_to16b(color_24b_t color_24b);
+typedef struct hsv_t {
+    union {
+        struct {
+            float hue;        // 0–360 degrees
+            float saturation; // 0–1
+            float value;      // 0–1
+        };
+        float data[3];
+    };
+} __attribute__((packed)) hsv_t;
 
+#define HSV(h, s, v) ((hsv_t){ .hue = (h), .saturation = (s), .value = (v) })
+
+color_24b_t hsv_to_rgb(const hsv_t* hsv);
 
 #ifdef __cplusplus
 }

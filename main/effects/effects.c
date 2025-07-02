@@ -21,8 +21,9 @@
 
 #define EFFECTS_DATA_PROCESSED_BIT BIT0
 
-extern void effect_raw(led_matrix_t* led_matrix, const processed_input_result_t* processed_input_result);
-extern void effect_simple(led_matrix_t* led_matrix, const processed_input_result_t* processed_input_result);
+extern void effect_raw(const led_matrix_t* led_matrix, const processed_input_result_t* processed_input_result);
+extern void effect_simple(const led_matrix_t* led_matrix, const processed_input_result_t* processed_input_result);
+extern void effect_fire(const led_matrix_t* led_matrix, const processed_input_result_t* processed_input_result);
 extern void effect_multicolor(const led_matrix_t* led_matrix, const processed_input_result_t* processed_input_result);
 
 static const char *TAG = "EFFECTS";
@@ -36,7 +37,7 @@ static void effects_task(void *params) {
     ESP_LOGI(TAG, "Start task");
 
     effects_source_t recent_source = EFFECTS_SOURCE_MICROPHONE;
-    effects_type_t recent_effect = EFFECTS_TYPE_MULTICOLOR;
+    effects_type_t recent_effect = EFFECTS_TYPE_FIRE;
     effects_cmd_t received_cmd;
 
     while(1) {
@@ -62,6 +63,8 @@ static void effects_task(void *params) {
         const processed_input_result_t* processed_input_result = sources_await_processed_input_result(recent_source, pdMS_TO_TICKS(100));
 
         // Apply effect
+        led_matrix_clear(&workspace_led_matrix);
+
         switch (recent_effect) {
         case EFFECTS_TYPE_RAW:
             effect_raw(&workspace_led_matrix, processed_input_result);
@@ -69,6 +72,10 @@ static void effects_task(void *params) {
 
         case EFFECTS_TYPE_SIMPLE:
             effect_simple(&workspace_led_matrix, processed_input_result);
+            break;
+
+        case EFFECTS_TYPE_FIRE:
+            effect_fire(&workspace_led_matrix, processed_input_result);
             break;
 
         case EFFECTS_TYPE_MULTICOLOR:

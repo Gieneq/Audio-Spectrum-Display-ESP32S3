@@ -15,11 +15,7 @@ typedef struct bar_t {
 
 static bar_t bars[LED_MATRIX_COLUMNS];
 
-// static int64_t
-
-void effect_simple(led_matrix_t* led_matrix, const processed_input_result_t* processed_input_result) {
-    led_matrix_clear(led_matrix);
-
+void effect_simple(const led_matrix_t* led_matrix, const processed_input_result_t* processed_input_result) {
     const float delta_time = processed_input_result->dt_sec;
 
     for (uint8_t ix = 0; ix < LED_MATRIX_COLUMNS; ++ix) {
