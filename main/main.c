@@ -57,7 +57,7 @@ static const float SIM_FREQUENCIES[SIM_FREQUENCIES_COUNT] = {
 static float ampl_gain = 1.0F;
 static uint8_t sim_frequency_idx = 5; // 1kHz
 static option_select_t recent_option_selected = OPTION_SELECT_GAIN;
-static effect_select_t recent_effect_selected = EFFECT_SELECT_RAW;
+static effect_select_t recent_effect_selected = EFFECT_SELECT_FIRE;
 static option_source_t recent_source_selected = OPTION_SOURCE_MICROPHONE;
 
 static void info_prints() {
@@ -207,10 +207,21 @@ static void button_left_released_callback(void *arg, void *data) {
 
         case OPTION_SELECT_EFFECT:
             /* Loop left selected effect */
-            --recent_effect_selected;
-            recent_effect_selected %= EFFECT_SELECT_COUNT;
-            //TODO
-            ESP_LOGI(TAG, "Effect loop left to: %d.", recent_effect_selected);
+            if (recent_effect_selected == EFFECT_SELECT_RAW) {
+                recent_effect_selected = EFFECT_SELECT_MULTICOLOR;
+            } else if (recent_effect_selected == EFFECT_SELECT_MULTICOLOR) {
+                recent_effect_selected = EFFECT_SELECT_FIRE;
+            } else if (recent_effect_selected == EFFECT_SELECT_FIRE) {
+                recent_effect_selected = EFFECT_SELECT_SIMPLE;
+            } else {
+                recent_effect_selected = EFFECT_SELECT_RAW;
+            }
+            
+            cmd.data.effects_type = recent_effect_selected;
+            cmd.type = EFFECTS_CMD_SET_EFFECT;
+            effects_send_cmd(cmd);
+
+            model_if->set_effect(recent_effect_selected);
             break;
 
         case OPTION_SELECT_SOURCE:
@@ -302,10 +313,21 @@ static void button_right_released_callback(void *arg, void *data) {
 
         case OPTION_SELECT_EFFECT:
             /* Loop right selected effect */
-            ++recent_effect_selected;
-            recent_effect_selected %= EFFECT_SELECT_COUNT;
-            //TODO
-            ESP_LOGI(TAG, "Effect loop right to: %d.", recent_effect_selected);
+            if (recent_effect_selected == EFFECT_SELECT_RAW) {
+                recent_effect_selected = EFFECT_SELECT_SIMPLE;
+            } else if (recent_effect_selected == EFFECT_SELECT_SIMPLE) {
+                recent_effect_selected = EFFECT_SELECT_FIRE;
+            } else if (recent_effect_selected == EFFECT_SELECT_FIRE) {
+                recent_effect_selected = EFFECT_SELECT_MULTICOLOR;
+            } else {
+                recent_effect_selected = EFFECT_SELECT_RAW;
+            }
+            
+            cmd.data.effects_type = recent_effect_selected;
+            cmd.type = EFFECTS_CMD_SET_EFFECT;
+            effects_send_cmd(cmd);
+
+            model_if->set_effect(recent_effect_selected);
             break;
 
         case OPTION_SELECT_SOURCE:

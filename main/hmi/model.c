@@ -31,6 +31,7 @@ typedef struct model_t {
         float gain;
         float frequency;
         option_source_t source;
+        effect_select_t effect;
     } options_values;
 
     option_select_t option_selected;
@@ -71,6 +72,10 @@ static void model_set_source(option_source_t source) {
     get_model()->options_values.source = source;
 }
 
+static void model_set_effect(effect_select_t effect) {
+    get_model()->options_values.effect = effect;
+}
+
 static model_t* get_model() {
     static model_t* _model_ptr;
     if(!_model_ptr) {
@@ -86,6 +91,7 @@ static model_t* get_model() {
         _model_ptr->interface.set_gain = model_set_gain;
         _model_ptr->interface.set_frequency= model_set_frequency;
         _model_ptr->interface.set_source = model_set_source;
+        _model_ptr->interface.set_effect = model_set_effect;
 
         _model_ptr->front_buttons.left_clicked = false;
         _model_ptr->front_buttons.right_clicked = false;
@@ -93,6 +99,7 @@ static model_t* get_model() {
         _model_ptr->options_values.gain = 1.0F;
         _model_ptr->options_values.frequency = 1000.0F;
         _model_ptr->options_values.source = OPTION_SOURCE_MICROPHONE;
+        _model_ptr->options_values.effect = EFFECT_SELECT_FIRE;
 
         _model_ptr->option_selected = OPTION_SELECT_GAIN;
 
@@ -190,6 +197,30 @@ void model_draw(gdisplay_api_t* gd_api) {
             gd_api->draw_bytes_bitmap(68, 6, LABEL_SOURCE_WIDTH, label_source_graphics_bytes, LABEL_SOURCE_BYTES_COUNT);
         } 
         else if (get_model()->option_selected == OPTION_SELECT_EFFECT) {
+            const char* effect_text = NULL;
+            switch (get_model()->options_values.effect) {
+            case EFFECT_SELECT_RAW:
+                effect_text = "RAW";
+                break;
+
+            case EFFECT_SELECT_SIMPLE:
+                effect_text = "SIMPLE";
+                break;
+
+            case EFFECT_SELECT_FIRE:
+                effect_text = "FIRE";
+                break;
+
+            case EFFECT_SELECT_MULTICOLOR:
+                effect_text = "MULTICOLOR";
+                break;
+
+            default:
+                effect_text = "UNKNOWN";
+            }
+
+            gd_api->draw_text(140, 41, &font_rockwell_4pt, effect_text);
+
             gd_api->draw_bytes_bitmap(68, 6, LABEL_EFFECT_WIDTH, label_effect_graphics_bytes, LABEL_EFFECT_BYTES_COUNT);
         }
         

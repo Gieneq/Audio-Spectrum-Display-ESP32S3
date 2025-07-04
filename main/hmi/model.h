@@ -22,6 +22,7 @@ typedef struct model_interface_t {
     void (*set_gain)(float g);
     void (*set_frequency)(float freq);
     void (*set_source)(option_source_t source);
+    void (*set_effect)(effect_select_t effect);
 } model_interface_t;
 
 bool model_interface_access(model_interface_t** model_if, TickType_t timeout_tick_time);
